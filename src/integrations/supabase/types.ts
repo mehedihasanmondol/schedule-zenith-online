@@ -383,10 +383,15 @@ export type Database = {
           client_id: string
           created_at: string | null
           date: string
+          end_date: string | null
           end_time: string
+          expected_profiles: number | null
           id: string
+          is_editable: boolean | null
           is_locked: boolean | null
+          name: string | null
           notes: string | null
+          per_hour_rate: number | null
           profile_id: string
           project_id: string
           start_time: string
@@ -398,10 +403,15 @@ export type Database = {
           client_id: string
           created_at?: string | null
           date: string
+          end_date?: string | null
           end_time: string
+          expected_profiles?: number | null
           id?: string
+          is_editable?: boolean | null
           is_locked?: boolean | null
+          name?: string | null
           notes?: string | null
+          per_hour_rate?: number | null
           profile_id: string
           project_id: string
           start_time: string
@@ -413,10 +423,15 @@ export type Database = {
           client_id?: string
           created_at?: string | null
           date?: string
+          end_date?: string | null
           end_time?: string
+          expected_profiles?: number | null
           id?: string
+          is_editable?: boolean | null
           is_locked?: boolean | null
+          name?: string | null
           notes?: string | null
+          per_hour_rate?: number | null
           profile_id?: string
           project_id?: string
           start_time?: string
@@ -450,42 +465,63 @@ export type Database = {
       }
       working_hours: {
         Row: {
+          actual_hours: number | null
           client_id: string
           created_at: string
           date: string
           end_time: string
+          hourly_rate: number | null
           id: string
+          notes: string | null
+          overtime_hours: number | null
+          payable_amount: number | null
           profile_id: string
           project_id: string
           roster_id: string | null
+          sign_in_time: string | null
+          sign_out_time: string | null
           start_time: string
           status: string
           total_hours: number
           updated_at: string
         }
         Insert: {
+          actual_hours?: number | null
           client_id: string
           created_at?: string
           date: string
           end_time: string
+          hourly_rate?: number | null
           id?: string
+          notes?: string | null
+          overtime_hours?: number | null
+          payable_amount?: number | null
           profile_id: string
           project_id: string
           roster_id?: string | null
+          sign_in_time?: string | null
+          sign_out_time?: string | null
           start_time: string
           status?: string
           total_hours: number
           updated_at?: string
         }
         Update: {
+          actual_hours?: number | null
           client_id?: string
           created_at?: string
           date?: string
           end_time?: string
+          hourly_rate?: number | null
           id?: string
+          notes?: string | null
+          overtime_hours?: number | null
+          payable_amount?: number | null
           profile_id?: string
           project_id?: string
           roster_id?: string | null
+          sign_in_time?: string | null
+          sign_out_time?: string | null
           start_time?: string
           status?: string
           total_hours?: number

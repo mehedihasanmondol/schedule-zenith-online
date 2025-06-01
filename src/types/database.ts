@@ -55,6 +55,13 @@ export interface WorkingHour {
   roster_id?: string;
   created_at: string;
   updated_at: string;
+  sign_in_time?: string;
+  sign_out_time?: string;
+  actual_hours?: number;
+  overtime_hours?: number;
+  hourly_rate?: number;
+  payable_amount?: number;
+  notes?: string;
   profiles?: Profile;
   clients?: Client;
   projects?: Project;
@@ -107,6 +114,11 @@ export interface Roster {
   is_locked: boolean;
   created_at: string;
   updated_at: string;
+  name?: string;
+  expected_profiles?: number;
+  per_hour_rate?: number;
+  is_editable?: boolean;
+  end_date?: string;
   profiles?: Profile;
   clients?: Client;
   projects?: Project;
