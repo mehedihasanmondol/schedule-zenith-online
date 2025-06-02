@@ -63,7 +63,7 @@ export type Database = {
         Row: {
           amount: number
           bank_account_id: string | null
-          category: string
+          category: Database["public"]["Enums"]["transaction_category"]
           client_id: string | null
           created_at: string
           date: string
@@ -77,7 +77,7 @@ export type Database = {
         Insert: {
           amount: number
           bank_account_id?: string | null
-          category: string
+          category: Database["public"]["Enums"]["transaction_category"]
           client_id?: string | null
           created_at?: string
           date?: string
@@ -91,7 +91,7 @@ export type Database = {
         Update: {
           amount?: number
           bank_account_id?: string | null
-          category?: string
+          category?: Database["public"]["Enums"]["transaction_category"]
           client_id?: string | null
           created_at?: string
           date?: string
@@ -129,6 +129,111 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bulk_payroll: {
+        Row: {
+          created_at: string
+          created_by: string
+          description: string | null
+          id: string
+          name: string
+          pay_period_end: string
+          pay_period_start: string
+          processed_records: number | null
+          status: string
+          total_amount: number | null
+          total_records: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          description?: string | null
+          id?: string
+          name: string
+          pay_period_end: string
+          pay_period_start: string
+          processed_records?: number | null
+          status?: string
+          total_amount?: number | null
+          total_records?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          id?: string
+          name?: string
+          pay_period_end?: string
+          pay_period_start?: string
+          processed_records?: number | null
+          status?: string
+          total_amount?: number | null
+          total_records?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bulk_payroll_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bulk_payroll_items: {
+        Row: {
+          bulk_payroll_id: string
+          created_at: string
+          error_message: string | null
+          id: string
+          payroll_id: string | null
+          profile_id: string
+          status: string
+        }
+        Insert: {
+          bulk_payroll_id: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          payroll_id?: string | null
+          profile_id: string
+          status?: string
+        }
+        Update: {
+          bulk_payroll_id?: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          payroll_id?: string | null
+          profile_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bulk_payroll_items_bulk_payroll_id_fkey"
+            columns: ["bulk_payroll_id"]
+            isOneToOne: false
+            referencedRelation: "bulk_payroll"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bulk_payroll_items_payroll_id_fkey"
+            columns: ["payroll_id"]
+            isOneToOne: false
+            referencedRelation: "payroll"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bulk_payroll_items_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -202,8 +307,110 @@ export type Database = {
         }
         Relationships: []
       }
+      notification_permissions: {
+        Row: {
+          can_create_bulk_notifications: boolean
+          can_create_notifications: boolean
+          created_at: string
+          id: string
+          profile_id: string
+        }
+        Insert: {
+          can_create_bulk_notifications?: boolean
+          can_create_notifications?: boolean
+          created_at?: string
+          id?: string
+          profile_id: string
+        }
+        Update: {
+          can_create_bulk_notifications?: boolean
+          can_create_notifications?: boolean
+          created_at?: string
+          id?: string
+          profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_permissions_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          action_data: Json | null
+          action_type: string | null
+          actioned_at: string | null
+          created_at: string
+          id: string
+          is_actioned: boolean
+          is_read: boolean
+          message: string
+          priority: string
+          read_at: string | null
+          recipient_profile_id: string
+          related_id: string | null
+          sender_profile_id: string | null
+          title: string
+          type: string
+        }
+        Insert: {
+          action_data?: Json | null
+          action_type?: string | null
+          actioned_at?: string | null
+          created_at?: string
+          id?: string
+          is_actioned?: boolean
+          is_read?: boolean
+          message: string
+          priority?: string
+          read_at?: string | null
+          recipient_profile_id: string
+          related_id?: string | null
+          sender_profile_id?: string | null
+          title: string
+          type: string
+        }
+        Update: {
+          action_data?: Json | null
+          action_type?: string | null
+          actioned_at?: string | null
+          created_at?: string
+          id?: string
+          is_actioned?: boolean
+          is_read?: boolean
+          message?: string
+          priority?: string
+          read_at?: string | null
+          recipient_profile_id?: string
+          related_id?: string | null
+          sender_profile_id?: string | null
+          title?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_recipient_profile_id_fkey"
+            columns: ["recipient_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_sender_profile_id_fkey"
+            columns: ["sender_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payroll: {
         Row: {
+          bank_account_id: string | null
           created_at: string
           deductions: number
           gross_pay: number
@@ -218,6 +425,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          bank_account_id?: string | null
           created_at?: string
           deductions?: number
           gross_pay?: number
@@ -232,6 +440,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          bank_account_id?: string | null
           created_at?: string
           deductions?: number
           gross_pay?: number
@@ -246,6 +455,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "payroll_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "payroll_profile_id_fkey"
             columns: ["profile_id"]
@@ -378,6 +594,42 @@ export type Database = {
         }
         Relationships: []
       }
+      roster_profiles: {
+        Row: {
+          created_at: string
+          id: string
+          profile_id: string
+          roster_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          profile_id: string
+          roster_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          profile_id?: string
+          roster_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "roster_profiles_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "roster_profiles_roster_id_fkey"
+            columns: ["roster_id"]
+            isOneToOne: false
+            referencedRelation: "rosters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       rosters: {
         Row: {
           client_id: string
@@ -456,6 +708,83 @@ export type Database = {
           },
           {
             foreignKeyName: "rosters_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      salary_templates: {
+        Row: {
+          bank_account_id: string | null
+          base_hourly_rate: number | null
+          client_id: string | null
+          created_at: string
+          deduction_percentage: number | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          overtime_multiplier: number | null
+          profile_id: string | null
+          project_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          bank_account_id?: string | null
+          base_hourly_rate?: number | null
+          client_id?: string | null
+          created_at?: string
+          deduction_percentage?: number | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          overtime_multiplier?: number | null
+          profile_id?: string | null
+          project_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          bank_account_id?: string | null
+          base_hourly_rate?: number | null
+          client_id?: string | null
+          created_at?: string
+          deduction_percentage?: number | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          overtime_multiplier?: number | null
+          profile_id?: string | null
+          project_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "salary_templates_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "salary_templates_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "salary_templates_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "salary_templates_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
@@ -611,6 +940,18 @@ export type Database = {
         | "reports_generate"
         | "notifications_view"
       employment_type: "full-time" | "part-time" | "casual"
+      transaction_category:
+        | "income"
+        | "expense"
+        | "transfer"
+        | "salary"
+        | "equipment"
+        | "materials"
+        | "travel"
+        | "office"
+        | "utilities"
+        | "marketing"
+        | "other"
       user_role:
         | "admin"
         | "employee"
@@ -755,6 +1096,19 @@ export const Constants = {
         "notifications_view",
       ],
       employment_type: ["full-time", "part-time", "casual"],
+      transaction_category: [
+        "income",
+        "expense",
+        "transfer",
+        "salary",
+        "equipment",
+        "materials",
+        "travel",
+        "office",
+        "utilities",
+        "marketing",
+        "other",
+      ],
       user_role: [
         "admin",
         "employee",

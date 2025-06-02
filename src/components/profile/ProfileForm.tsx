@@ -7,6 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Profile } from "@/types/database";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 interface ProfileFormProps {
   isOpen: boolean;
@@ -17,6 +19,15 @@ interface ProfileFormProps {
 }
 
 export const ProfileForm = ({ isOpen, onClose, onSubmit, editingProfile, loading }: ProfileFormProps) => {
+  const { toast } = useToast();
+  const [isCreatingUser, setIsCreatingUser] = useState(false);
+
+  // Get current date in YYYY-MM-DD format
+  const getCurrentDate = () => {
+    const today = new Date();
+    return today.toISOString().split('T')[0];
+  };
+
   const [formData, setFormData] = useState({
     full_name: "",
     email: "",
@@ -28,7 +39,8 @@ export const ProfileForm = ({ isOpen, onClose, onSubmit, editingProfile, loading
     hourly_rate: 0,
     salary: 0,
     tax_file_number: "",
-    start_date: ""
+    start_date: getCurrentDate(), // Set current date as default
+    password: "" // Add password field for new users only
   });
 
   useEffect(() => {
@@ -44,7 +56,8 @@ export const ProfileForm = ({ isOpen, onClose, onSubmit, editingProfile, loading
         hourly_rate: editingProfile.hourly_rate || 0,
         salary: editingProfile.salary || 0,
         tax_file_number: editingProfile.tax_file_number || "",
-        start_date: editingProfile.start_date || ""
+        start_date: editingProfile.start_date || getCurrentDate(),
+        password: "" // Don't show password for existing users
       });
     } else {
       setFormData({
@@ -58,14 +71,80 @@ export const ProfileForm = ({ isOpen, onClose, onSubmit, editingProfile, loading
         hourly_rate: 0,
         salary: 0,
         tax_file_number: "",
-        start_date: ""
+        start_date: getCurrentDate(), // Always use current date for new profiles
+        password: ""
       });
     }
   }, [editingProfile, isOpen]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit(formData);
+    
+    if (!editingProfile) {
+      // Create new user through auth system
+      await handleCreateNewUser();
+    } else {
+      // Update existing profile - exclude password from update data
+      const { password, ...updateData } = formData;
+      onSubmit(updateData);
+    }
+  };
+
+  const handleCreateNewUser = async () => {
+    if (!formData.email || !formData.password) {
+      toast({
+        title: "Error",
+        description: "Email and password are required for new users",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsCreatingUser(true);
+
+    try {
+      // Create auth user first
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+        options: {
+          data: {
+            full_name: formData.full_name
+          }
+        }
+      });
+
+      if (authError) throw authError;
+
+      if (authData.user) {
+        // Update the profile with additional information
+        const { password, ...profileData } = formData;
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .update(profileData)
+          .eq('id', authData.user.id);
+
+        if (profileError) throw profileError;
+
+        toast({
+          title: "Success",
+          description: "New user profile created successfully",
+        });
+
+        onClose();
+        // Trigger parent component to refresh
+        onSubmit(formData);
+      }
+    } catch (error: any) {
+      console.error('Error creating user:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create user profile",
+        variant: "destructive"
+      });
+    } finally {
+      setIsCreatingUser(false);
+    }
   };
 
   const roleOptions = [
@@ -86,7 +165,7 @@ export const ProfileForm = ({ isOpen, onClose, onSubmit, editingProfile, loading
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{editingProfile ? "Edit Profile" : "Profile Information"}</DialogTitle>
+          <DialogTitle>{editingProfile ? "Edit Profile" : "Create New Profile"}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -110,8 +189,24 @@ export const ProfileForm = ({ isOpen, onClose, onSubmit, editingProfile, loading
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 placeholder="Enter email address"
                 required
+                disabled={!!editingProfile} // Disable email editing for existing users
               />
             </div>
+
+            {/* Password field only for new users */}
+            {!editingProfile && (
+              <div>
+                <Label htmlFor="password">Password *</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  placeholder="Enter password"
+                  required
+                />
+              </div>
+            )}
 
             <div>
               <Label htmlFor="phone">Phone</Label>
@@ -243,8 +338,8 @@ export const ProfileForm = ({ isOpen, onClose, onSubmit, editingProfile, loading
             <Button type="button" variant="outline" onClick={onClose} className="flex-1">
               Cancel
             </Button>
-            <Button type="submit" disabled={loading} className="flex-1">
-              {loading ? "Saving..." : editingProfile ? "Update Profile" : "Save Profile"}
+            <Button type="submit" disabled={loading || isCreatingUser} className="flex-1">
+              {isCreatingUser ? "Creating User..." : loading ? "Saving..." : editingProfile ? "Update Profile" : "Create Profile"}
             </Button>
           </div>
         </form>

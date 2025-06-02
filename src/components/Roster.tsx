@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,11 +7,12 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Search, Calendar, Clock, Users, DollarSign } from "lucide-react";
+import { Plus, Search, Calendar, Clock, Users, DollarSign, CalendarDays } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { Roster as RosterType, Profile, Client, Project } from "@/types/database";
+import { Roster as RosterType, Profile, Client, Project, RosterProfile } from "@/types/database";
 import { useToast } from "@/hooks/use-toast";
-import { ProfileSelector } from "@/components/common/ProfileSelector";
+import { MultipleProfileSelector } from "@/components/common/MultipleProfileSelector";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export const Roster = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -22,10 +22,27 @@ export const Roster = () => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("calendar"); // Changed default to calendar
   const { toast } = useToast();
 
+  const generateDefaultRosterName = () => {
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+    const timeStr = now.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    });
+    return `Roster ${dateStr} at ${timeStr}`;
+  };
+
   const [formData, setFormData] = useState({
-    profile_id: "",
+    profile_ids: [] as string[],
     client_id: "",
     project_id: "",
     date: "",
@@ -34,7 +51,7 @@ export const Roster = () => {
     end_time: "",
     notes: "",
     status: "pending",
-    name: "",
+    name: generateDefaultRosterName(),
     expected_profiles: 1,
     per_hour_rate: 0
   });
@@ -52,20 +69,23 @@ export const Roster = () => {
         .from('rosters')
         .select(`
           *,
-          profiles!rosters_profile_id_fkey (id, full_name, role),
           clients!rosters_client_id_fkey (id, company),
-          projects!rosters_project_id_fkey (id, name)
+          projects!rosters_project_id_fkey (id, name),
+          roster_profiles!roster_profiles_roster_id_fkey (
+            id,
+            profile_id,
+            profiles!roster_profiles_profile_id_fkey (id, full_name, role)
+          )
         `)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
       
-      // Handle the data safely with proper type checking
       const rostersData = (data || []).map(roster => ({
         ...roster,
-        profiles: Array.isArray(roster.profiles) ? roster.profiles[0] : roster.profiles,
         clients: Array.isArray(roster.clients) ? roster.clients[0] : roster.clients,
-        projects: Array.isArray(roster.projects) ? roster.projects[0] : roster.projects
+        projects: Array.isArray(roster.projects) ? roster.projects[0] : roster.projects,
+        roster_profiles: roster.roster_profiles || []
       }));
       
       setRosters(rostersData as RosterType[]);
@@ -137,43 +157,69 @@ export const Roster = () => {
     return Math.max(0, diffHours);
   };
 
-  const generateDefaultName = (client: Client | undefined, project: Project | undefined, date: string) => {
-    if (!client || !project || !date) return "";
-    
-    const formattedDate = new Date(date).toLocaleDateString('en-US', { 
-      month: 'short', 
-      day: 'numeric' 
-    });
-    
-    return `${client.company} - ${project.name} (${formattedDate})`;
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
+      if (formData.profile_ids.length === 0) {
+        toast({
+          title: "Error",
+          description: "Please select at least one profile",
+          variant: "destructive"
+        });
+        return;
+      }
+
       const totalHours = calculateTotalHours(formData.start_time, formData.end_time);
       const selectedClient = clients.find(c => c.id === formData.client_id);
       const selectedProject = projects.find(p => p.id === formData.project_id);
       
-      const defaultName = generateDefaultName(selectedClient, selectedProject, formData.date);
-      const finalName = formData.name.trim() || defaultName;
+      const defaultName = selectedClient && selectedProject 
+        ? `${selectedClient.company} - ${selectedProject.name} (${new Date(formData.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})`
+        : "";
+      const finalName = formData.name.trim() || defaultName || generateDefaultRosterName();
       
-      const { error } = await supabase
+      // Create roster with first profile as primary
+      const { data: roster, error: rosterError } = await supabase
         .from('rosters')
         .insert([{
-          ...formData,
+          profile_id: formData.profile_ids[0], // Use first selected profile as primary
+          client_id: formData.client_id,
+          project_id: formData.project_id,
+          date: formData.date,
+          end_date: formData.end_date || null,
+          start_time: formData.start_time,
+          end_time: formData.end_time,
           total_hours: totalHours,
-          name: finalName
-        }]);
+          notes: formData.notes,
+          status: formData.status,
+          name: finalName,
+          expected_profiles: formData.expected_profiles,
+          per_hour_rate: formData.per_hour_rate
+        }])
+        .select()
+        .single();
 
-      if (error) throw error;
+      if (rosterError) throw rosterError;
+
+      // Create roster_profiles entries for all selected profiles
+      const rosterProfilesData = formData.profile_ids.map(profileId => ({
+        roster_id: roster.id,
+        profile_id: profileId
+      }));
+
+      const { error: profilesError } = await supabase
+        .from('roster_profiles')
+        .insert(rosterProfilesData);
+
+      if (profilesError) throw profilesError;
+
       toast({ title: "Success", description: "Roster created successfully" });
       
       setIsDialogOpen(false);
       setFormData({
-        profile_id: "",
+        profile_ids: [],
         client_id: "",
         project_id: "",
         date: "",
@@ -182,7 +228,7 @@ export const Roster = () => {
         end_time: "",
         notes: "",
         status: "pending",
-        name: "",
+        name: generateDefaultRosterName(),
         expected_profiles: 1,
         per_hour_rate: 0
       });
@@ -250,10 +296,27 @@ export const Roster = () => {
   };
 
   const filteredRosters = rosters.filter(roster =>
-    (roster.profiles?.full_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (roster.roster_profiles?.some(rp => 
+      rp.profiles?.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
+    ) || false) ||
     (roster.projects?.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
     (roster.name || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  // Calendar view helper function
+  const getCalendarRosters = () => {
+    const rostersByDate: { [key: string]: RosterType[] } = {};
+    filteredRosters.forEach(roster => {
+      const dateKey = roster.date;
+      if (!rostersByDate[dateKey]) {
+        rostersByDate[dateKey] = [];
+      }
+      rostersByDate[dateKey].push(roster);
+    });
+    return rostersByDate;
+  };
+
+  const calendarRosters = getCalendarRosters();
 
   if (loading && rosters.length === 0) {
     return <div className="flex justify-center items-center h-64">Loading...</div>;
@@ -276,18 +339,32 @@ export const Roster = () => {
               Create Roster
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Create Enhanced Roster</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <ProfileSelector
+              <div>
+                <Label htmlFor="name">Roster Name</Label>
+                <Input
+                  id="name"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="Auto-generated if left empty"
+                />
+                <p className="text-sm text-gray-500 mt-1">
+                  Default: {generateDefaultRosterName()}
+                </p>
+              </div>
+
+              <MultipleProfileSelector
                 profiles={profiles}
-                selectedProfileId={formData.profile_id}
-                onProfileSelect={(profileId) => setFormData({ ...formData, profile_id: profileId })}
-                label="Select Profile"
-                placeholder="Choose a team member"
+                selectedProfileIds={formData.profile_ids}
+                onProfileSelect={(profileIds) => setFormData({ ...formData, profile_ids: profileIds })}
+                label="Select Team Members"
+                placeholder="Choose team members"
                 showRoleFilter={true}
+                className="border rounded-lg p-3 bg-gray-50"
               />
               
               <div>
@@ -320,25 +397,6 @@ export const Roster = () => {
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
-
-              <div>
-                <Label htmlFor="name">Roster Name (Optional)</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Leave empty for auto-generated name"
-                />
-                {formData.client_id && formData.project_id && formData.date && (
-                  <p className="text-sm text-gray-500 mt-1">
-                    Auto-generated: {generateDefaultName(
-                      clients.find(c => c.id === formData.client_id),
-                      projects.find(p => p.id === formData.project_id),
-                      formData.date
-                    )}
-                  </p>
-                )}
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -485,7 +543,7 @@ export const Roster = () => {
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>Enhanced Roster Schedule ({filteredRosters.length})</CardTitle>
+            <CardTitle>Roster Views</CardTitle>
             <div className="relative w-64">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
               <Input
@@ -498,118 +556,188 @@ export const Roster = () => {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">Roster Name</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">Profile</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">Project</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">Date Range</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">Time</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">Hours</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">Rate</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">Status</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredRosters.map((roster) => (
-                  <tr key={roster.id} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="py-3 px-4">
-                      <div className="font-medium text-gray-900">{roster.name || 'Unnamed Roster'}</div>
-                      {roster.expected_profiles > 1 && (
-                        <div className="text-sm text-gray-600">
-                          Expected: {roster.expected_profiles} members
-                        </div>
-                      )}
-                    </td>
-                    <td className="py-3 px-4">
-                      <div>
-                        <div className="font-medium text-gray-900">{roster.profiles?.full_name || 'N/A'}</div>
-                        <div className="text-sm text-gray-600">{roster.profiles?.role || 'N/A'}</div>
-                      </div>
-                    </td>
-                    <td className="py-3 px-4">
-                      <div>
-                        <div className="font-medium text-gray-900">{roster.projects?.name || 'N/A'}</div>
-                        <div className="text-sm text-gray-600">{roster.clients?.company || 'N/A'}</div>
-                      </div>
-                    </td>
-                    <td className="py-3 px-4 text-gray-600">
-                      <div className="text-sm">
-                        {new Date(roster.date).toLocaleDateString()}
-                        {roster.end_date && roster.end_date !== roster.date && (
-                          <div className="text-xs text-gray-500">
-                            to {new Date(roster.end_date).toLocaleDateString()}
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="calendar">Calendar View</TabsTrigger>
+              <TabsTrigger value="list">List View</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="calendar" className="mt-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {Object.entries(calendarRosters).map(([date, dateRosters]) => (
+                  <div key={date} className="space-y-2">
+                    <div className="flex items-center gap-2 mb-3 border-b pb-2">
+                      <CalendarDays className="h-5 w-5 text-blue-600" />
+                      <h3 className="font-semibold text-gray-900">
+                        {new Date(date).toLocaleDateString('en-US', {
+                          weekday: 'long',
+                          month: 'short',
+                          day: 'numeric'
+                        })}
+                      </h3>
+                      <Badge variant="outline">{dateRosters.length}</Badge>
+                    </div>
+                    {dateRosters.map((roster) => (
+                      <Card key={roster.id} className="border-l-4 border-l-blue-500">
+                        <CardContent className="p-4">
+                          <div className="space-y-2">
+                            <div className="flex items-start justify-between">
+                              <h4 className="font-medium text-sm">{roster.name || 'Unnamed Roster'}</h4>
+                              <Badge variant={
+                                roster.status === "confirmed" ? "default" : 
+                                roster.status === "pending" ? "secondary" : "outline"
+                              } className="text-xs">
+                                {roster.status}
+                              </Badge>
+                            </div>
+                            
+                            <div className="text-xs text-gray-600">
+                              <div className="flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                {roster.start_time} - {roster.end_time}
+                              </div>
+                            </div>
+                            
+                            <div className="text-xs">
+                              <div className="font-medium">{roster.projects?.name}</div>
+                              <div className="text-gray-600">{roster.clients?.company}</div>
+                            </div>
+                            
+                            <div className="flex flex-wrap gap-1">
+                              {roster.roster_profiles?.slice(0, 3).map((rp) => (
+                                <Badge key={rp.id} variant="secondary" className="text-xs">
+                                  {rp.profiles?.full_name}
+                                </Badge>
+                              ))}
+                              {(roster.roster_profiles?.length || 0) > 3 && (
+                                <Badge variant="outline" className="text-xs">
+                                  +{(roster.roster_profiles?.length || 0) - 3} more
+                                </Badge>
+                              )}
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-2 text-xs">
+                              <div className="flex items-center gap-1">
+                                <Users className="h-3 w-3 text-blue-600" />
+                                <span>{roster.roster_profiles?.length || 0} assigned</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <Clock className="h-3 w-3 text-purple-600" />
+                                <span>{roster.total_hours}h</span>
+                              </div>
+                            </div>
                           </div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="py-3 px-4 text-gray-600">
-                      <div className="text-sm">
-                        {roster.start_time} - {roster.end_time}
-                      </div>
-                    </td>
-                    <td className="py-3 px-4 text-gray-600">
-                      <div className="font-medium">{roster.total_hours}h</div>
-                    </td>
-                    <td className="py-3 px-4 text-gray-600">
-                      <div className="text-sm">
-                        {roster.per_hour_rate > 0 ? `$${roster.per_hour_rate}/hr` : 'Profile rate'}
-                      </div>
-                    </td>
-                    <td className="py-3 px-4">
-                      <Badge variant={
-                        roster.status === "confirmed" ? "default" : 
-                        roster.status === "pending" ? "secondary" : "outline"
-                      }>
-                        {roster.status}
-                      </Badge>
-                      {roster.is_locked && (
-                        <div className="text-xs text-orange-600 mt-1">🔒 Locked</div>
-                      )}
-                      {!roster.is_editable && (
-                        <div className="text-xs text-red-600 mt-1">✏️ Non-editable</div>
-                      )}
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-2">
-                        {roster.status === "pending" && roster.is_editable && (
-                          <>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                ))}
+              </div>
+              
+              {Object.keys(calendarRosters).length === 0 && (
+                <div className="text-center py-8 text-gray-500">
+                  No rosters found for the selected criteria
+                </div>
+              )}
+            </TabsContent>
+            
+            <TabsContent value="list" className="mt-4">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-gray-200">
+                      <th className="text-left py-3 px-4 font-medium text-gray-600">Roster Name</th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-600">Team Members</th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-600">Project</th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-600">Date Range</th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-600">Time</th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-600">Status</th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-600">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredRosters.map((roster) => (
+                      <tr key={roster.id} className="border-b border-gray-100 hover:bg-gray-50">
+                        <td className="py-3 px-4">
+                          <div className="font-medium text-gray-900">{roster.name || 'Unnamed Roster'}</div>
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="flex flex-wrap gap-1">
+                            {roster.roster_profiles?.map((rp) => (
+                              <Badge key={rp.id} variant="secondary" className="text-xs">
+                                {rp.profiles?.full_name}
+                              </Badge>
+                            )) || <span className="text-gray-500">No profiles assigned</span>}
+                          </div>
+                        </td>
+                        <td className="py-3 px-4">
+                          <div>
+                            <div className="font-medium text-gray-900">{roster.projects?.name || 'N/A'}</div>
+                            <div className="text-sm text-gray-600">{roster.clients?.company || 'N/A'}</div>
+                          </div>
+                        </td>
+                        <td className="py-3 px-4 text-gray-600">
+                          <div className="text-sm">
+                            {new Date(roster.date).toLocaleDateString()}
+                            {roster.end_date && roster.end_date !== roster.date && (
+                              <div className="text-xs text-gray-500">
+                                to {new Date(roster.end_date).toLocaleDateString()}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-3 px-4 text-gray-600">
+                          <div className="text-sm">
+                            {roster.start_time} - {roster.end_time}
+                          </div>
+                        </td>
+                        <td className="py-3 px-4">
+                          <Badge variant={
+                            roster.status === "confirmed" ? "default" : 
+                            roster.status === "pending" ? "secondary" : "outline"
+                          }>
+                            {roster.status}
+                          </Badge>
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="flex items-center gap-2">
+                            {roster.status === "pending" && roster.is_editable && (
+                              <>
+                                <Button 
+                                  size="sm" 
+                                  variant="outline"
+                                  onClick={() => updateStatus(roster.id, "confirmed")}
+                                  className="text-green-600 hover:text-green-700"
+                                >
+                                  Confirm
+                                </Button>
+                                <Button 
+                                  size="sm" 
+                                  variant="outline"
+                                  onClick={() => updateStatus(roster.id, "cancelled")}
+                                  className="text-red-600 hover:text-red-700"
+                                >
+                                  Cancel
+                                </Button>
+                              </>
+                            )}
                             <Button 
                               size="sm" 
                               variant="outline"
-                              onClick={() => updateStatus(roster.id, "confirmed")}
-                              className="text-green-600 hover:text-green-700"
-                            >
-                              Confirm
-                            </Button>
-                            <Button 
-                              size="sm" 
-                              variant="outline"
-                              onClick={() => updateStatus(roster.id, "cancelled")}
+                              onClick={() => deleteRoster(roster.id)}
                               className="text-red-600 hover:text-red-700"
                             >
-                              Cancel
+                              Delete
                             </Button>
-                          </>
-                        )}
-                        <Button 
-                          size="sm" 
-                          variant="outline"
-                          onClick={() => deleteRoster(roster.id)}
-                          className="text-red-600 hover:text-red-700"
-                        >
-                          Delete
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
     </div>

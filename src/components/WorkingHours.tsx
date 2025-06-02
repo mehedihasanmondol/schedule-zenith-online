@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,11 +7,12 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Search, Clock, CheckCircle, XCircle, DollarSign, Timer } from "lucide-react";
+import { Plus, Search, Clock, CheckCircle, XCircle, DollarSign, Timer, Edit } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { WorkingHour, Profile, Client, Project } from "@/types/database";
 import { useToast } from "@/hooks/use-toast";
 import { ProfileSelector } from "@/components/common/ProfileSelector";
+import { EditWorkingHoursDialog } from "@/components/EditWorkingHoursDialog";
 
 export const WorkingHours = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -22,13 +22,15 @@ export const WorkingHours = () => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingWorkingHour, setEditingWorkingHour] = useState<WorkingHour | null>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const { toast } = useToast();
 
   const [formData, setFormData] = useState({
     profile_id: "",
     client_id: "",
     project_id: "",
-    date: "",
+    date: new Date().toISOString().split('T')[0], // Auto-fill with today's date
     start_time: "",
     end_time: "",
     sign_in_time: "",
@@ -45,6 +47,16 @@ export const WorkingHours = () => {
     fetchProjects();
   }, []);
 
+  // Auto-fill today's date when dialog opens
+  useEffect(() => {
+    if (isDialogOpen && !editingWorkingHour) {
+      setFormData(prev => ({
+        ...prev,
+        date: new Date().toISOString().split('T')[0]
+      }));
+    }
+  }, [isDialogOpen, editingWorkingHour]);
+
   const fetchWorkingHours = async () => {
     try {
       const { data, error } = await supabase
@@ -59,7 +71,6 @@ export const WorkingHours = () => {
 
       if (error) throw error;
       
-      // Handle the data safely with proper type checking
       const workingHoursData = (data || []).map(wh => ({
         ...wh,
         profiles: Array.isArray(wh.profiles) ? wh.profiles[0] : wh.profiles,
@@ -149,16 +160,18 @@ export const WorkingHours = () => {
       const totalHours = calculateTotalHours(formData.start_time, formData.end_time);
       const actualHours = calculateActualHours(formData.sign_in_time, formData.sign_out_time);
       const overtimeHours = Math.max(0, actualHours - totalHours);
-      const payableAmount = actualHours * formData.hourly_rate;
+      const payableAmount = (actualHours || totalHours) * formData.hourly_rate;
       
       const { error } = await supabase
         .from('working_hours')
         .insert([{
           ...formData,
           total_hours: totalHours,
-          actual_hours: actualHours,
+          actual_hours: actualHours || null,
           overtime_hours: overtimeHours,
-          payable_amount: payableAmount
+          payable_amount: payableAmount,
+          sign_in_time: formData.sign_in_time || null,
+          sign_out_time: formData.sign_out_time || null
         }]);
 
       if (error) throw error;
@@ -169,7 +182,7 @@ export const WorkingHours = () => {
         profile_id: "",
         client_id: "",
         project_id: "",
-        date: "",
+        date: new Date().toISOString().split('T')[0], // Reset to today's date
         start_time: "",
         end_time: "",
         sign_in_time: "",
@@ -214,6 +227,11 @@ export const WorkingHours = () => {
     }
   };
 
+  const handleEdit = (workingHour: WorkingHour) => {
+    setEditingWorkingHour(workingHour);
+    setIsEditDialogOpen(true);
+  };
+
   const filteredWorkingHours = workingHours.filter(wh =>
     (wh.profiles?.full_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
     (wh.projects?.name || '').toLowerCase().includes(searchTerm.toLowerCase())
@@ -253,7 +271,7 @@ export const WorkingHours = () => {
                   setFormData({ 
                     ...formData, 
                     profile_id: profileId,
-                    hourly_rate: profile?.hourly_rate || 0
+                    hourly_rate: profile?.hourly_rate || 0 // Auto-suggest hourly rate
                   });
                 }}
                 label="Select Profile"
@@ -332,7 +350,7 @@ export const WorkingHours = () => {
                 </div>
 
                 <div className="border-t pt-4">
-                  <h4 className="font-medium text-gray-900 mb-2">Actual Hours</h4>
+                  <h4 className="font-medium text-gray-900 mb-2">Actual Hours (Optional)</h4>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="sign_in_time">Sign In Time</Label>
@@ -341,6 +359,7 @@ export const WorkingHours = () => {
                         type="time"
                         value={formData.sign_in_time}
                         onChange={(e) => setFormData({ ...formData, sign_in_time: e.target.value })}
+                        placeholder="Optional"
                       />
                     </div>
                     <div>
@@ -350,6 +369,7 @@ export const WorkingHours = () => {
                         type="time"
                         value={formData.sign_out_time}
                         onChange={(e) => setFormData({ ...formData, sign_out_time: e.target.value })}
+                        placeholder="Optional"
                       />
                     </div>
                   </div>
@@ -527,26 +547,36 @@ export const WorkingHours = () => {
                       </Badge>
                     </td>
                     <td className="py-3 px-4">
-                      {wh.status === "pending" && (
-                        <div className="flex items-center gap-2">
-                          <Button 
-                            size="sm" 
-                            variant="outline"
-                            onClick={() => updateStatus(wh.id, "approved")}
-                            className="text-green-600 hover:text-green-700"
-                          >
-                            <CheckCircle className="h-4 w-4" />
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            variant="outline"
-                            onClick={() => updateStatus(wh.id, "rejected")}
-                            className="text-red-600 hover:text-red-700"
-                          >
-                            <XCircle className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      )}
+                      <div className="flex items-center gap-2">
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => handleEdit(wh)}
+                          className="text-blue-600 hover:text-blue-700"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        {wh.status === "pending" && (
+                          <>
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => updateStatus(wh.id, "approved")}
+                              className="text-green-600 hover:text-green-700"
+                            >
+                              <CheckCircle className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => updateStatus(wh.id, "rejected")}
+                              className="text-red-600 hover:text-red-700"
+                            >
+                              <XCircle className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -555,6 +585,19 @@ export const WorkingHours = () => {
           </div>
         </CardContent>
       </Card>
+
+      <EditWorkingHoursDialog
+        workingHour={editingWorkingHour}
+        isOpen={isEditDialogOpen}
+        onClose={() => {
+          setIsEditDialogOpen(false);
+          setEditingWorkingHour(null);
+        }}
+        onUpdate={fetchWorkingHours}
+        profiles={profiles}
+        clients={clients}
+        projects={projects}
+      />
     </div>
   );
 };

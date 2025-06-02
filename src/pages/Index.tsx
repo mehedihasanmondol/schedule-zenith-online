@@ -12,9 +12,11 @@ import { PayrollComponent } from "@/components/Payroll";
 import { Notifications } from "@/components/Notifications";
 import { Reports } from "@/components/Reports";
 import { BankBalance } from "@/components/BankBalance";
+import { SalaryManagement } from "@/components/SalaryManagement";
 import { RolePermissionsManager } from "@/components/RolePermissionsManager";
 import { UserMenu } from "@/components/UserMenu";
 import { RoleDashboardRouter } from "@/components/RoleDashboardRouter";
+import { RosterReport } from "@/components/RosterReport";
 import { useAuth } from "@/hooks/useAuth";
 
 const Index = () => {
@@ -37,8 +39,12 @@ const Index = () => {
         return <WorkingHours />;
       case "roster":
         return <Roster />;
+      case "roster-report":
+        return <RosterReport />;
       case "payroll":
         return <PayrollComponent />;
+      case "salary":
+        return <SalaryManagement />;
       case "notifications":
         return <Notifications />;
       case "reports":

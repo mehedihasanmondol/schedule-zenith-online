@@ -14,7 +14,8 @@ import {
   DollarSign,
   Menu,
   Shield,
-  User
+  User,
+  Calculator
 } from "lucide-react";
 
 interface SidebarProps {
@@ -73,6 +74,12 @@ export const Sidebar = ({ activeTab, onTabChange, hasPermission }: SidebarProps)
       id: "payroll", 
       label: "Payroll", 
       icon: DollarSign,
+      permission: "payroll_view"
+    },
+    { 
+      id: "salary", 
+      label: "Salary Management", 
+      icon: Calculator,
       permission: "payroll_view"
     },
     { 

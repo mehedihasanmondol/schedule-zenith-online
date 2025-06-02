@@ -86,7 +86,7 @@ export interface BankTransaction {
   description: string;
   amount: number;
   type: 'deposit' | 'withdrawal';
-  category: string;
+  category: 'income' | 'expense' | 'transfer' | 'salary' | 'equipment' | 'materials' | 'travel' | 'office' | 'utilities' | 'marketing' | 'other';
   date: string;
   created_at: string;
   updated_at: string;
@@ -98,6 +98,14 @@ export interface BankTransaction {
   projects?: Project;
   profiles?: Profile;
   bank_accounts?: BankAccount;
+}
+
+export interface RosterProfile {
+  id: string;
+  roster_id: string;
+  profile_id: string;
+  created_at: string;
+  profiles?: Profile;
 }
 
 export interface Roster {
@@ -122,6 +130,7 @@ export interface Roster {
   profiles?: Profile;
   clients?: Client;
   projects?: Project;
+  roster_profiles?: RosterProfile[];
 }
 
 export interface Payroll {
@@ -137,11 +146,88 @@ export interface Payroll {
   status: 'pending' | 'approved' | 'paid';
   created_at: string;
   updated_at: string;
+  bank_account_id?: string;
   profiles?: Profile;
+  bank_accounts?: BankAccount;
+}
+
+export interface BulkPayroll {
+  id: string;
+  name: string;
+  description?: string;
+  pay_period_start: string;
+  pay_period_end: string;
+  created_by: string;
+  status: 'draft' | 'processing' | 'completed' | 'failed';
+  total_records: number;
+  processed_records: number;
+  total_amount: number;
+  created_at: string;
+  updated_at: string;
+  bulk_payroll_items?: BulkPayrollItem[];
+  profiles?: Profile;
+}
+
+export interface BulkPayrollItem {
+  id: string;
+  bulk_payroll_id: string;
+  profile_id: string;
+  payroll_id?: string;
+  status: 'pending' | 'processed' | 'failed';
+  error_message?: string;
+  created_at: string;
+  profiles?: Profile;
+  payroll?: Payroll;
+}
+
+export interface SalaryTemplate {
+  id: string;
+  name: string;
+  description?: string;
+  profile_id?: string;
+  client_id?: string;
+  project_id?: string;
+  bank_account_id?: string;
+  base_hourly_rate: number;
+  overtime_multiplier: number;
+  deduction_percentage: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  profiles?: Profile;
+  clients?: Client;
+  projects?: Project;
+  bank_accounts?: BankAccount;
 }
 
 export interface RolePermission {
   id: string;
   role: 'admin' | 'employee' | 'accountant' | 'operation' | 'sales_manager';
   permission: string;
+}
+
+export interface Notification {
+  id: string;
+  title: string;
+  message: string;
+  type: string;
+  recipient_profile_id: string;
+  sender_profile_id?: string;
+  related_id?: string;
+  action_type: 'approve' | 'confirm' | 'grant' | 'cancel' | 'reject' | 'none';
+  action_data?: any;
+  is_read: boolean;
+  is_actioned: boolean;
+  priority: 'low' | 'medium' | 'high';
+  created_at: string;
+  read_at?: string;
+  actioned_at?: string;
+}
+
+export interface NotificationPermission {
+  id: string;
+  profile_id: string;
+  can_create_notifications: boolean;
+  can_create_bulk_notifications: boolean;
+  created_at: string;
 }
