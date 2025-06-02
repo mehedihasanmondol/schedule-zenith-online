@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,13 +16,19 @@ interface SalarySheetManagerProps {
   onRefresh: () => void;
 }
 
-export const SalarySheetManager = ({ payrolls, profiles, onRefresh }: SalarySheetManagerProps) => {
+export const SalarySheetManager = ({ payrolls: initialPayrolls, profiles, onRefresh }: SalarySheetManagerProps) => {
+  const [payrolls, setPayrolls] = useState<Payroll[]>(initialPayrolls);
   const [selectedPeriod, setSelectedPeriod] = useState("");
   const [groupedPayrolls, setGroupedPayrolls] = useState<Record<string, Payroll[]>>({});
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedSheet, setSelectedSheet] = useState<Payroll[] | null>(null);
   const [showPrintView, setShowPrintView] = useState(false);
   const { toast } = useToast();
+
+  // Update local payrolls when prop changes
+  useEffect(() => {
+    setPayrolls(initialPayrolls);
+  }, [initialPayrolls]);
 
   useEffect(() => {
     groupPayrollsByPeriod();
@@ -174,7 +179,7 @@ export const SalarySheetManager = ({ payrolls, profiles, onRefresh }: SalaryShee
         if (notificationError) console.error('Failed to send notification:', notificationError);
       }
 
-      // Update payroll status
+      // Update payroll status in database
       const { error } = await supabase
         .from('payroll')
         .update({ status })
@@ -182,12 +187,18 @@ export const SalarySheetManager = ({ payrolls, profiles, onRefresh }: SalaryShee
 
       if (error) throw error;
       
+      // Update local state without full refresh
+      setPayrolls(prevPayrolls => 
+        prevPayrolls.map(p => 
+          p.id === payrollId ? { ...p, status } : p
+        )
+      );
+      
       toast({
         title: "Success",
         description: `Payroll status updated to ${status}`
       });
       
-      onRefresh();
     } catch (error: any) {
       console.error('Error updating payroll status:', error);
       toast({
@@ -219,12 +230,16 @@ export const SalarySheetManager = ({ payrolls, profiles, onRefresh }: SalaryShee
 
       if (error) throw error;
 
+      // Update local state without full refresh
+      setPayrolls(prevPayrolls => 
+        prevPayrolls.filter(p => p.id !== payrollId)
+      );
+
       toast({
         title: "Success",
         description: "Payroll deleted successfully"
       });
 
-      onRefresh();
     } catch (error: any) {
       console.error('Error deleting payroll:', error);
       toast({
