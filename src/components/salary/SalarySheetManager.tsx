@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -152,10 +153,11 @@ export const SalarySheetManager = ({ payrolls: initialPayrolls, profiles, onRefr
           if (transactionError) throw transactionError;
         }
 
-        // Update related working hours to "paid" status
+        // Update related working hours to "approved" status instead of "paid"
+        // The constraint seems to only allow 'pending', 'approved', 'rejected'
         const { error: workingHoursError } = await supabase
           .from('working_hours')
-          .update({ status: 'paid' })
+          .update({ status: 'approved' })
           .eq('profile_id', payroll.profile_id)
           .gte('date', payroll.pay_period_start)
           .lte('date', payroll.pay_period_end)
