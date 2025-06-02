@@ -38,16 +38,23 @@ export const PayrollGenerationWizard = ({ profiles, workingHours, onRefresh }: P
     fetchExistingPayrolls();
   }, []);
 
+  // Separate effect for filtering profiles that depends on all required data
   useEffect(() => {
-    filterEligibleProfiles();
-  }, [profiles, workingHours, dateRange]);
+    if (profiles.length > 0 && existingPayrolls.length >= 0) {
+      filterEligibleProfiles();
+    }
+  }, [profiles, workingHours, dateRange, existingPayrolls]);
 
+  // Separate effect for generating preview when selection changes
   useEffect(() => {
-    if (selectedProfileIds.length > 0 && dateRange.start && dateRange.end) {
+    if (selectedProfileIds.length > 0 && dateRange.start && dateRange.end && filteredProfiles.length > 0) {
       generatePayrollPreview();
       checkForOverlappingPayrolls();
+    } else {
+      setPayrollPreview([]);
+      setOverlappingPayrolls([]);
     }
-  }, [selectedProfileIds, dateRange]);
+  }, [selectedProfileIds, dateRange, filteredProfiles]);
 
   const fetchBankAccounts = async () => {
     try {
@@ -76,13 +83,23 @@ export const PayrollGenerationWizard = ({ profiles, workingHours, onRefresh }: P
         .select('*');
 
       if (error) throw error;
-      setExistingPayrolls(data || []);
+      // Cast the data to match our Payroll type
+      const typedPayrolls = (data || []).map(payroll => ({
+        ...payroll,
+        status: payroll.status as 'pending' | 'approved' | 'paid'
+      }));
+      setExistingPayrolls(typedPayrolls);
     } catch (error) {
       console.error('Error fetching existing payrolls:', error);
     }
   };
 
   const filterEligibleProfiles = () => {
+    console.log('Filtering profiles with date range:', dateRange);
+    console.log('Available profiles:', profiles.length);
+    console.log('Available working hours:', workingHours.length);
+    console.log('Existing payrolls:', existingPayrolls.length);
+
     // Only show profiles that have unpaid working hours in the selected date range
     const profilesWithUnpaidHours = profiles.filter(profile => {
       const profileHours = workingHours.filter(wh => 
@@ -91,6 +108,8 @@ export const PayrollGenerationWizard = ({ profiles, workingHours, onRefresh }: P
         wh.date <= dateRange.end &&
         wh.status === 'approved' // Only approved hours
       );
+
+      console.log(`Profile ${profile.full_name} has ${profileHours.length} approved hours in range`);
 
       // Check if any of these hours are already paid (exist in a paid payroll)
       const hasUnpaidHours = profileHours.some(wh => {
@@ -103,10 +122,17 @@ export const PayrollGenerationWizard = ({ profiles, workingHours, onRefresh }: P
         return !isPaid;
       });
 
+      console.log(`Profile ${profile.full_name} has unpaid hours:`, hasUnpaidHours);
       return hasUnpaidHours;
     });
 
+    console.log('Filtered profiles with unpaid hours:', profilesWithUnpaidHours.length);
     setFilteredProfiles(profilesWithUnpaidHours);
+
+    // Reset selected profiles if they're no longer eligible
+    setSelectedProfileIds(prev => 
+      prev.filter(id => profilesWithUnpaidHours.some(p => p.id === id))
+    );
   };
 
   const checkForOverlappingPayrolls = () => {
@@ -301,7 +327,7 @@ export const PayrollGenerationWizard = ({ profiles, workingHours, onRefresh }: P
                     <div className="mb-4">
                       <div className="flex items-center gap-2 text-sm text-blue-600 mb-2">
                         <Calculator className="h-4 w-4" />
-                        Showing only employees with unpaid approved working hours
+                        Showing only employees with unpaid approved working hours ({filteredProfiles.length} found)
                       </div>
                     </div>
                     <EnhancedProfileSelector
@@ -321,7 +347,10 @@ export const PayrollGenerationWizard = ({ profiles, workingHours, onRefresh }: P
                       <Input
                         type="date"
                         value={dateRange.start}
-                        onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
+                        onChange={(e) => {
+                          console.log('Date range start changed to:', e.target.value);
+                          setDateRange(prev => ({ ...prev, start: e.target.value }));
+                        }}
                       />
                     </div>
                     
@@ -330,7 +359,10 @@ export const PayrollGenerationWizard = ({ profiles, workingHours, onRefresh }: P
                       <Input
                         type="date"
                         value={dateRange.end}
-                        onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
+                        onChange={(e) => {
+                          console.log('Date range end changed to:', e.target.value);
+                          setDateRange(prev => ({ ...prev, end: e.target.value }));
+                        }}
                       />
                     </div>
 
