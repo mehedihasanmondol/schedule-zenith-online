@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -421,8 +420,8 @@ export const Notifications = () => {
       <NotificationCreateForm
         isOpen={isCreateFormOpen}
         onClose={() => setIsCreateFormOpen(false)}
-        profiles={profiles}
         onSuccess={fetchNotifications}
+        currentUserId={user?.id || ""}
       />
     </div>
   );

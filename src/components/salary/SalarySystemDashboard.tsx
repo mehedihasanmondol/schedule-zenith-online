@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -169,26 +168,26 @@ export const SalarySystemDashboard = () => {
         </Card>
       </div>
 
-      <Tabs defaultValue="payroll-generation" className="space-y-4">
+      <Tabs defaultValue="salary-sheets" className="space-y-4">
         <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="payroll-generation">Payroll Generation</TabsTrigger>
           <TabsTrigger value="salary-sheets">Salary Sheets</TabsTrigger>
+          <TabsTrigger value="payroll-generation">Payroll Generation</TabsTrigger>
           <TabsTrigger value="bulk-processing">Bulk Processing</TabsTrigger>
           <TabsTrigger value="reports">Reports & Analytics</TabsTrigger>
         </TabsList>
-
-        <TabsContent value="payroll-generation">
-          <PayrollGenerationWizard 
-            profiles={profiles}
-            workingHours={workingHours}
-            onRefresh={fetchAllData}
-          />
-        </TabsContent>
 
         <TabsContent value="salary-sheets">
           <SalarySheetManager 
             payrolls={payrolls}
             profiles={profiles}
+            onRefresh={fetchAllData}
+          />
+        </TabsContent>
+
+        <TabsContent value="payroll-generation">
+          <PayrollGenerationWizard 
+            profiles={profiles}
+            workingHours={workingHours}
             onRefresh={fetchAllData}
           />
         </TabsContent>
