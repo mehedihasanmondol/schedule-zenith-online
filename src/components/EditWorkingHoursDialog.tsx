@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
-import { WorkingHour, Profile, Client, Project } from "@/types/database";
+import { WorkingHour, Profile, Client, Project, WorkingHoursStatus } from "@/types/database";
 import { useToast } from "@/hooks/use-toast";
 import { ProfileSelector } from "@/components/common/ProfileSelector";
 
@@ -44,7 +44,7 @@ export const EditWorkingHoursDialog = ({
     sign_out_time: "",
     hourly_rate: 0,
     notes: "",
-    status: "pending"
+    status: "pending" as WorkingHoursStatus
   });
 
   useEffect(() => {
@@ -266,7 +266,7 @@ export const EditWorkingHoursDialog = ({
 
             <div>
               <Label htmlFor="status">Status</Label>
-              <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
+              <Select value={formData.status} onValueChange={(value: WorkingHoursStatus) => setFormData({ ...formData, status: value })}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>

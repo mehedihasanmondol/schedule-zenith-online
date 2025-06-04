@@ -52,7 +52,7 @@ export const BulkSalaryProcessor = ({ bulkPayrolls, profiles, onRefresh }: BulkS
           pay_period_start: bulkData.pay_period_start,
           pay_period_end: bulkData.pay_period_end,
           created_by: 'system', // In real app, this would be the current user ID
-          status: 'processing',
+          status: 'processing' as const,
           total_records: selectedProfileIds.length,
           processed_records: 0,
           total_amount: 0
@@ -66,7 +66,7 @@ export const BulkSalaryProcessor = ({ bulkPayrolls, profiles, onRefresh }: BulkS
       const bulkItems = selectedProfileIds.map(profileId => ({
         bulk_payroll_id: bulkPayrollData.id,
         profile_id: profileId,
-        status: 'pending'
+        status: 'pending' as const
       }));
 
       const { error: itemsError } = await supabase
@@ -81,10 +81,10 @@ export const BulkSalaryProcessor = ({ bulkPayrolls, profiles, onRefresh }: BulkS
 
       for (const profileId of selectedProfileIds) {
         try {
-          // Get working hours for this profile
+          // Get working hours for this profile using the individual working hour rates
           const { data: workingHours } = await supabase
             .from('working_hours')
-            .select('*')
+            .select('*, profiles(*)')
             .eq('profile_id', profileId)
             .eq('status', 'approved')
             .gte('date', bulkData.pay_period_start)
@@ -93,9 +93,16 @@ export const BulkSalaryProcessor = ({ bulkPayrolls, profiles, onRefresh }: BulkS
           const profile = profiles.find(p => p.id === profileId);
           if (!profile || !workingHours) continue;
 
-          const totalHours = workingHours.reduce((sum, wh) => sum + wh.total_hours, 0);
-          const hourlyRate = profile.hourly_rate || 0;
-          const grossPay = totalHours * hourlyRate;
+          // Calculate using individual working hours rates instead of profile rate
+          let totalHours = 0;
+          let grossPay = 0;
+
+          for (const wh of workingHours) {
+            totalHours += wh.total_hours;
+            // Use the hourly_rate from each working hour record
+            grossPay += wh.total_hours * (wh.hourly_rate || 0);
+          }
+
           const deductions = grossPay * 0.1; // 10% deductions
           const netPay = grossPay - deductions;
 
@@ -107,11 +114,11 @@ export const BulkSalaryProcessor = ({ bulkPayrolls, profiles, onRefresh }: BulkS
               pay_period_start: bulkData.pay_period_start,
               pay_period_end: bulkData.pay_period_end,
               total_hours: totalHours,
-              hourly_rate: hourlyRate,
+              hourly_rate: workingHours.length > 0 ? workingHours[0].hourly_rate || 0 : 0, // Use rate from first working hour
               gross_pay: grossPay,
               deductions: deductions,
               net_pay: netPay,
-              status: 'pending'
+              status: 'pending' as const
             }])
             .select()
             .single();
@@ -123,7 +130,7 @@ export const BulkSalaryProcessor = ({ bulkPayrolls, profiles, onRefresh }: BulkS
             .from('bulk_payroll_items')
             .update({ 
               payroll_id: payrollData.id, 
-              status: 'processed' 
+              status: 'processed' as const
             })
             .eq('bulk_payroll_id', bulkPayrollData.id)
             .eq('profile_id', profileId);
@@ -141,7 +148,7 @@ export const BulkSalaryProcessor = ({ bulkPayrolls, profiles, onRefresh }: BulkS
           await supabase
             .from('bulk_payroll_items')
             .update({ 
-              status: 'failed',
+              status: 'failed' as const,
               error_message: error instanceof Error ? error.message : 'Unknown error'
             })
             .eq('bulk_payroll_id', bulkPayrollData.id)
@@ -153,7 +160,7 @@ export const BulkSalaryProcessor = ({ bulkPayrolls, profiles, onRefresh }: BulkS
       await supabase
         .from('bulk_payroll')
         .update({
-          status: 'completed',
+          status: 'completed' as const,
           processed_records: processedCount,
           total_amount: totalAmount
         })

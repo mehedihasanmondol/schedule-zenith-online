@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,7 +12,7 @@ interface TransactionFormProps {
     profile_id: string;
     bank_account_id: string;
     amount: number;
-    category: "income" | "expense" | "transfer" | "salary" | "equipment" | "materials" | "travel" | "office" | "utilities" | "marketing" | "other";
+    category: "income" | "expense" | "transfer" | "salary" | "equipment" | "materials" | "travel" | "office" | "utilities" | "marketing" | "opening_balance" | "other";
     description: string;
     type: "deposit" | "withdrawal";
     date: string;
@@ -50,6 +49,7 @@ export const TransactionForm = ({
     { value: "office", label: "Office" },
     { value: "utilities", label: "Utilities" },
     { value: "marketing", label: "Marketing" },
+    { value: "opening_balance", label: "Opening Balance" },
     { value: "other", label: "Other" }
   ];
 

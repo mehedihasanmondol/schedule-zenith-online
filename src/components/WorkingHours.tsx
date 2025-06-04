@@ -14,7 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ProfileSelector } from "@/components/common/ProfileSelector";
 import { EditWorkingHoursDialog } from "@/components/EditWorkingHoursDialog";
 
-export const WorkingHours = () => {
+export const WorkingHoursComponent = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [workingHours, setWorkingHours] = useState<WorkingHour[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);

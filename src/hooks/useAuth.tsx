@@ -3,12 +3,13 @@ import { useState, useEffect, createContext, useContext } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { UserRole } from '@/types/database';
 
 interface Profile {
   id: string;
   full_name: string | null;
   avatar_url: string | null;
-  role: 'admin' | 'employee' | 'accountant' | 'operation' | 'sales_manager';
+  role: UserRole;
   is_active: boolean;
 }
 
@@ -49,14 +50,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       
       // Fetch user permissions from database
       if (data?.role) {
-        await fetchUserPermissions(data.role as 'admin' | 'employee' | 'accountant' | 'operation' | 'sales_manager');
+        await fetchUserPermissions(data.role as UserRole);
       }
     } catch (error) {
       console.error('Error fetching profile:', error);
     }
   };
 
-  const fetchUserPermissions = async (role: 'admin' | 'employee' | 'accountant' | 'operation' | 'sales_manager') => {
+  const fetchUserPermissions = async (role: UserRole) => {
     try {
       const { data, error } = await supabase
         .from('role_permissions')
