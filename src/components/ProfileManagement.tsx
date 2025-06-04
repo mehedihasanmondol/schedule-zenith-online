@@ -2,21 +2,18 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Users, Plus, Search } from "lucide-react";
+import { Users, Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Profile } from "@/types/database";
 import { useToast } from "@/hooks/use-toast";
-import { ProfileTable } from "./profile/ProfileTable";
 import { ProfileForm } from "./profile/ProfileForm";
 import { ProfileStats } from "./profile/ProfileStats";
 import { BankAccountManagement } from "./bank/BankAccountManagement";
+import { ServerSideProfileTable } from "./profile/ServerSideProfileTable";
 
 export const ProfileManagement = () => {
   const [profiles, setProfiles] = useState<Profile[]>([]);
-  const [filteredProfiles, setFilteredProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingProfile, setEditingProfile] = useState<Profile | null>(null);
   const [formLoading, setFormLoading] = useState(false);
@@ -24,19 +21,10 @@ export const ProfileManagement = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    fetchProfiles();
+    fetchProfilesForStats();
   }, []);
 
-  useEffect(() => {
-    const filtered = profiles.filter(profile => 
-      profile.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      profile.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      profile.role?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-    setFilteredProfiles(filtered);
-  }, [profiles, searchTerm]);
-
-  const fetchProfiles = async () => {
+  const fetchProfilesForStats = async () => {
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -46,10 +34,10 @@ export const ProfileManagement = () => {
       if (error) throw error;
       setProfiles(data || []);
     } catch (error) {
-      console.error('Error fetching profiles:', error);
+      console.error('Error fetching profiles for stats:', error);
       toast({
         title: "Error",
-        description: "Failed to fetch profiles",
+        description: "Failed to fetch profile statistics",
         variant: "destructive"
       });
     } finally {
@@ -74,7 +62,7 @@ export const ProfileManagement = () => {
       if (error) throw error;
       
       toast({ title: "Success", description: "Profile deleted successfully" });
-      fetchProfiles();
+      fetchProfilesForStats(); // Refresh stats
     } catch (error: any) {
       console.error('Error deleting profile:', error);
       toast({
@@ -101,7 +89,7 @@ export const ProfileManagement = () => {
       
       setIsFormOpen(false);
       setEditingProfile(null);
-      fetchProfiles();
+      fetchProfilesForStats(); // Refresh stats
     } catch (error: any) {
       console.error('Error saving profile:', error);
       toast({
@@ -125,7 +113,7 @@ export const ProfileManagement = () => {
           <Users className="h-8 w-8 text-blue-600" />
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Profile Management</h1>
-            <p className="text-gray-600">Manage user profiles and their information</p>
+            <p className="text-gray-600">Manage user profiles with server-side pagination and exports</p>
           </div>
         </div>
         <Button onClick={() => setIsFormOpen(true)}>
@@ -138,24 +126,10 @@ export const ProfileManagement = () => {
 
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>All Profiles ({filteredProfiles.length})</CardTitle>
-            <div className="flex items-center gap-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                <Input
-                  placeholder="Search profiles..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 w-64"
-                />
-              </div>
-            </div>
-          </div>
+          <CardTitle>All Profiles</CardTitle>
         </CardHeader>
         <CardContent>
-          <ProfileTable 
-            profiles={filteredProfiles} 
+          <ServerSideProfileTable 
             onEdit={handleEdit} 
             onDelete={handleDelete}
             onManageBank={(profile) => setSelectedProfileForBank(profile)}
