@@ -2,21 +2,18 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Users, Plus, Search } from "lucide-react";
+import { Users, Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Profile } from "@/types/database";
 import { useToast } from "@/hooks/use-toast";
-import { ProfileTable } from "./profile/ProfileTable";
+import { EnhancedProfileTable } from "./profile/EnhancedProfileTable";
 import { ProfileForm } from "./profile/ProfileForm";
 import { ProfileStats } from "./profile/ProfileStats";
 import { BankAccountManagement } from "./bank/BankAccountManagement";
 
 export const ProfileManagement = () => {
   const [profiles, setProfiles] = useState<Profile[]>([]);
-  const [filteredProfiles, setFilteredProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingProfile, setEditingProfile] = useState<Profile | null>(null);
   const [formLoading, setFormLoading] = useState(false);
@@ -26,15 +23,6 @@ export const ProfileManagement = () => {
   useEffect(() => {
     fetchProfiles();
   }, []);
-
-  useEffect(() => {
-    const filtered = profiles.filter(profile => 
-      profile.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      profile.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      profile.role?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-    setFilteredProfiles(filtered);
-  }, [profiles, searchTerm]);
 
   const fetchProfiles = async () => {
     try {
@@ -97,7 +85,6 @@ export const ProfileManagement = () => {
         if (error) throw error;
         toast({ title: "Success", description: "Profile updated successfully" });
       }
-      // Note: Profile creation is handled in ProfileForm component
       
       setIsFormOpen(false);
       setEditingProfile(null);
@@ -114,21 +101,19 @@ export const ProfileManagement = () => {
     }
   };
 
-  if (loading) {
-    return <div className="flex justify-center items-center h-64">Loading profiles...</div>;
-  }
-
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 bg-gray-50 min-h-screen p-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Users className="h-8 w-8 text-blue-600" />
+          <div className="p-3 bg-blue-100 rounded-lg">
+            <Users className="h-8 w-8 text-blue-600" />
+          </div>
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Profile Management</h1>
-            <p className="text-gray-600">Manage user profiles and their information</p>
+            <p className="text-gray-600">Manage user profiles with advanced search, filtering, and export features</p>
           </div>
         </div>
-        <Button onClick={() => setIsFormOpen(true)}>
+        <Button onClick={() => setIsFormOpen(true)} className="bg-blue-600 hover:bg-blue-700">
           <Plus className="h-4 w-4 mr-2" />
           Add Profile
         </Button>
@@ -136,29 +121,17 @@ export const ProfileManagement = () => {
 
       <ProfileStats profiles={profiles} />
 
-      <Card>
+      <Card className="shadow-sm">
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>All Profiles ({filteredProfiles.length})</CardTitle>
-            <div className="flex items-center gap-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                <Input
-                  placeholder="Search profiles..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 w-64"
-                />
-              </div>
-            </div>
-          </div>
+          <CardTitle className="text-xl">All Profiles ({profiles.length})</CardTitle>
         </CardHeader>
-        <CardContent>
-          <ProfileTable 
-            profiles={filteredProfiles} 
+        <CardContent className="p-0">
+          <EnhancedProfileTable 
+            profiles={profiles} 
             onEdit={handleEdit} 
             onDelete={handleDelete}
             onManageBank={(profile) => setSelectedProfileForBank(profile)}
+            loading={loading}
           />
         </CardContent>
       </Card>
