@@ -1,15 +1,14 @@
 
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Users, Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Profile } from "@/types/database";
 import { useToast } from "@/hooks/use-toast";
 import { ProfileForm } from "./profile/ProfileForm";
-import { ProfileStats } from "./profile/ProfileStats";
 import { BankAccountManagement } from "./bank/BankAccountManagement";
 import { ServerSideProfileTable } from "./profile/ServerSideProfileTable";
+import { ModernProfileHeader } from "./profile/ModernProfileHeader";
+import { ModernProfileStats } from "./profile/ModernProfileStats";
 
 export const ProfileManagement = () => {
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -26,6 +25,7 @@ export const ProfileManagement = () => {
 
   const fetchProfilesForStats = async () => {
     try {
+      setLoading(true);
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
@@ -62,7 +62,7 @@ export const ProfileManagement = () => {
       if (error) throw error;
       
       toast({ title: "Success", description: "Profile deleted successfully" });
-      fetchProfilesForStats(); // Refresh stats
+      fetchProfilesForStats();
     } catch (error: any) {
       console.error('Error deleting profile:', error);
       toast({
@@ -85,11 +85,10 @@ export const ProfileManagement = () => {
         if (error) throw error;
         toast({ title: "Success", description: "Profile updated successfully" });
       }
-      // Note: Profile creation is handled in ProfileForm component
       
       setIsFormOpen(false);
       setEditingProfile(null);
-      fetchProfilesForStats(); // Refresh stats
+      fetchProfilesForStats();
     } catch (error: any) {
       console.error('Error saving profile:', error);
       toast({
@@ -102,33 +101,36 @@ export const ProfileManagement = () => {
     }
   };
 
+  const activeProfiles = profiles.filter(p => p.is_active).length;
+
   if (loading) {
-    return <div className="flex justify-center items-center h-64">Loading profiles...</div>;
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Users className="h-8 w-8 text-blue-600" />
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Profile Management</h1>
-            <p className="text-gray-600">Manage user profiles with server-side pagination and exports</p>
-          </div>
-        </div>
-        <Button onClick={() => setIsFormOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Profile
-        </Button>
-      </div>
+    <div className="space-y-8 p-6 bg-gray-50 min-h-screen">
+      <ModernProfileHeader
+        totalProfiles={profiles.length}
+        activeProfiles={activeProfiles}
+        onAddProfile={() => setIsFormOpen(true)}
+        onRefresh={fetchProfilesForStats}
+        loading={loading}
+      />
 
-      <ProfileStats profiles={profiles} />
+      <ModernProfileStats profiles={profiles} />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>All Profiles</CardTitle>
+      <Card className="shadow-xl border-0 bg-white">
+        <CardHeader className="bg-gradient-to-r from-gray-50 to-gray-100 border-b">
+          <CardTitle className="text-xl font-semibold text-gray-800 flex items-center gap-2">
+            <span className="w-2 h-2 bg-blue-600 rounded-full"></span>
+            All Profiles
+          </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-6">
           <ServerSideProfileTable 
             onEdit={handleEdit} 
             onDelete={handleDelete}
