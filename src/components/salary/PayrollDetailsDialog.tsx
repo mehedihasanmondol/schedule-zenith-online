@@ -9,16 +9,18 @@ import { Payroll, Profile, BankAccount } from "@/types/database";
 
 interface PayrollDetailsDialogProps {
   payroll: Payroll | null;
-  isOpen: boolean;
-  onClose: () => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onRefresh: () => void;
   profile?: Profile | null;
   bankAccount?: BankAccount | null;
 }
 
 export const PayrollDetailsDialog = ({ 
   payroll, 
-  isOpen, 
-  onClose, 
+  open, 
+  onOpenChange, 
+  onRefresh,
   profile, 
   bankAccount 
 }: PayrollDetailsDialogProps) => {
@@ -91,7 +93,7 @@ This is an automatically generated payroll statement.
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <div className="flex items-center justify-between">
