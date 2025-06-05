@@ -1,91 +1,88 @@
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { Plus, Search, Edit, Trash2, Calendar, Users } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { Roster, Client, Project, Profile, RosterStatus } from "@/types/database";
-import { useToast } from "@/hooks/use-toast";
-import { MultipleProfileSelector } from "./common/MultipleProfileSelector";
+import React, { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { Calendar, Clock, Users, Plus, Edit, Trash2 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import type { Roster, Profile, Client, Project } from '@/types/database';
+import { EnhancedRosterCalendarView } from './roster/EnhancedRosterCalendarView';
+import { RosterWeeklyFilter } from './roster/RosterWeeklyFilter';
+import { RosterActions } from './roster/RosterActions';
 
-export const RosterComponent = () => {
-  const [searchTerm, setSearchTerm] = useState("");
+const RosterManagement = () => {
   const [rosters, setRosters] = useState<Roster[]>([]);
+  const [profiles, setProfiles] = useState<Profile[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
-  const [profiles, setProfiles] = useState<Profile[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [formData, setFormData] = useState<Omit<Roster, 'id' | 'created_at' | 'updated_at'>[]>([
+    {
+      profile_id: '',
+      client_id: '',
+      project_id: '',
+      date: new Date().toISOString().split('T')[0],
+      start_time: '09:00',
+      end_time: '17:00',
+      total_hours: 8,
+      status: 'pending',
+      notes: '',
+      is_locked: false,
+      name: '',
+      expected_profiles: 1,
+      per_hour_rate: 0,
+      is_editable: true,
+      end_date: new Date().toISOString().split('T')[0],
+    }
+  ]);
+  const [loading, setLoading] = useState(false);
   const [editingRoster, setEditingRoster] = useState<Roster | null>(null);
   const { toast } = useToast();
-
-  const [formData, setFormData] = useState({
-    name: "",
-    profile_id: "",
-    client_id: "",
-    project_id: "",
-    date: "",
-    end_date: "",
-    start_time: "",
-    end_time: "",
-    total_hours: 0,
-    notes: "",
-    status: "pending" as RosterStatus,
-    expected_profiles: 1,
-    per_hour_rate: 0
-  });
-
-  const [selectedProfiles, setSelectedProfiles] = useState<string[]>([]);
+  const [isCalendarView, setIsCalendarView] = useState(false);
+  const [weekFilter, setWeekFilter] = useState({ start: '', end: '' });
 
   useEffect(() => {
-    fetchRosters();
-    fetchClients();
-    fetchProjects();
-    fetchProfiles();
+    fetchData();
   }, []);
 
-  const fetchRosters = async () => {
+  const fetchData = async () => {
+    setLoading(true);
     try {
-      const { data, error } = await supabase
+      const { data: rostersData, error: rostersError } = await supabase
         .from('rosters')
         .select(`
           *,
-          profiles (
-            id,
-            full_name
-          ),
-          clients (
-            id,
-            name,
-            company
-          ),
-          projects (
-            id,
-            name
-          ),
-          roster_profiles (
-            id,
-            profile_id,
-            profiles (
-              id,
-              full_name
-            )
-          )
-        `)
-        .order('created_at', { ascending: false });
+          profiles!rosters_profile_id_fkey (id, full_name, email, role, avatar_url, is_active, created_at, updated_at),
+          clients!rosters_client_id_fkey (id, name, company, email, status, created_at, updated_at),
+          projects!rosters_project_id_fkey (id, name, client_id, status, start_date, budget, created_at, updated_at)
+        `);
+      if (rostersError) throw rostersError;
+      setRosters(rostersData || []);
 
-      if (error) throw error;
-      setRosters(data || []);
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('*');
+      if (profilesError) throw profilesError;
+      setProfiles(profilesData || []);
+
+      const { data: clientsData, error: clientsError } = await supabase
+        .from('clients')
+        .select('*');
+      if (clientsError) throw clientsError;
+      setClients(clientsData || []);
+
+      const { data: projectsData, error: projectsError } = await supabase
+        .from('projects')
+        .select('*');
+      if (projectsError) throw projectsError;
+      setProjects(projectsData || []);
     } catch (error) {
-      console.error('Error fetching rosters:', error);
+      console.error('Error fetching data:', error);
       toast({
         title: "Error",
-        description: "Failed to fetch rosters",
+        description: "Failed to fetch data",
         variant: "destructive"
       });
     } finally {
@@ -93,49 +90,135 @@ export const RosterComponent = () => {
     }
   };
 
-  const fetchClients = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('clients')
-        .select('*')
-        .eq('status', 'active')
-        .order('company');
+  const handleInputChange = (index: number, event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value } = event.target;
+    const newFormData = [...formData];
+    newFormData[index] = { ...newFormData[index], [name]: value };
+    setFormData(newFormData);
+  };
 
-      if (error) throw error;
-      setClients(data || []);
-    } catch (error) {
-      console.error('Error fetching clients:', error);
+  const handleSelectChange = (index: number, name: string, value: string) => {
+    const newFormData = [...formData];
+    newFormData[index] = { ...newFormData[index], [name]: value };
+    setFormData(newFormData);
+  };
+
+  const handleDateTimeChange = (index: number, name: string, value: string) => {
+    const newFormData = [...formData];
+    newFormData[index] = { ...newFormData[index], [name]: value };
+    setFormData(newFormData);
+
+    // Auto-calculate total_hours when start_time and end_time change
+    if (name === 'start_time' || name === 'end_time') {
+      const startTime = newFormData[index].start_time;
+      const endTime = newFormData[index].end_time;
+
+      if (startTime && endTime) {
+        const [startHours, startMinutes] = startTime.split(':').map(Number);
+        const [endHours, endMinutes] = endTime.split(':').map(Number);
+
+        const startTotalMinutes = startHours * 60 + startMinutes;
+        const endTotalMinutes = endHours * 60 + endMinutes;
+
+        let diffMinutes = endTotalMinutes - startTotalMinutes;
+        if (diffMinutes < 0) {
+          diffMinutes += 24 * 60; // Account for crossing midnight
+        }
+
+        const totalHours = diffMinutes / 60;
+        newFormData[index] = { ...newFormData[index], total_hours: parseFloat(totalHours.toFixed(2)) };
+        setFormData(newFormData);
+      }
     }
   };
 
-  const fetchProjects = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('projects')
-        .select('*')
-        .eq('status', 'active')
-        .order('name');
+  const handleAddRoster = () => {
+    setFormData([
+      ...formData,
+      {
+        profile_id: '',
+        client_id: '',
+        project_id: '',
+        date: new Date().toISOString().split('T')[0],
+        start_time: '09:00',
+        end_time: '17:00',
+        total_hours: 8,
+        status: 'pending',
+        notes: '',
+        is_locked: false,
+        name: '',
+        expected_profiles: 1,
+        per_hour_rate: 0,
+        is_editable: true,
+        end_date: new Date().toISOString().split('T')[0],
+      }
+    ]);
+  };
 
-      if (error) throw error;
-      setProjects(data || []);
-    } catch (error) {
-      console.error('Error fetching projects:', error);
+  const handleRemoveRoster = (index: number) => {
+    const newFormData = [...formData];
+    newFormData.splice(index, 1);
+    setFormData(newFormData);
+  };
+
+  const handleEditRoster = (rosterId: string) => {
+    const roster = rosters.find(r => r.id === rosterId);
+    if (roster) {
+      setEditingRoster(roster);
+      setFormData([{
+        profile_id: roster.profile_id,
+        client_id: roster.client_id,
+        project_id: roster.project_id,
+        date: roster.date,
+        start_time: roster.start_time,
+        end_time: roster.end_time,
+        total_hours: roster.total_hours,
+        status: roster.status,
+        notes: roster.notes || '',
+        is_locked: roster.is_locked,
+        name: roster.name || '',
+        expected_profiles: roster.expected_profiles || 1,
+        per_hour_rate: roster.per_hour_rate || 0,
+        is_editable: roster.is_editable || true,
+        end_date: roster.end_date || new Date().toISOString().split('T')[0],
+      }]);
     }
   };
 
-  const fetchProfiles = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('is_active', true)
-        .order('full_name');
-
-      if (error) throw error;
-      setProfiles(data || []);
-    } catch (error) {
-      console.error('Error fetching profiles:', error);
+  const handleDeleteRoster = async (rosterId: string) => {
+    if (window.confirm("Are you sure you want to delete this roster?")) {
+      setLoading(true);
+      try {
+        const { error } = await supabase
+          .from('rosters')
+          .delete()
+          .eq('id', rosterId);
+        if (error) throw error;
+        toast({ title: "Success", description: "Roster deleted successfully" });
+        fetchData();
+      } catch (error) {
+        console.error('Error deleting roster:', error);
+        toast({
+          title: "Error",
+          description: "Failed to delete roster",
+          variant: "destructive"
+        });
+      } finally {
+        setLoading(false);
+      }
     }
+  };
+
+  const handleViewRoster = (rosterId: string) => {
+    const roster = rosters.find(r => r.id === rosterId);
+    if (roster) {
+      // For now, just edit - could be expanded to a view-only dialog
+      handleEditRoster(rosterId);
+    }
+  };
+
+  const handleWeekChange = (startDate: string, endDate: string) => {
+    setWeekFilter({ start: startDate, end: endDate });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -143,82 +226,47 @@ export const RosterComponent = () => {
     setLoading(true);
 
     try {
-      const rosterData = {
-        ...formData,
-        status: formData.status as RosterStatus
-      };
+      const formattedData = formData.map(data => ({
+        ...data,
+        status: data.status as 'pending' | 'confirmed' | 'cancelled'
+      }));
 
       if (editingRoster) {
         const { error } = await supabase
           .from('rosters')
-          .update(rosterData)
+          .update(formattedData[0])
           .eq('id', editingRoster.id);
-
         if (error) throw error;
-
-        // Update roster profiles if not editing
-        if (selectedProfiles.length > 0) {
-          // Delete existing assignments
-          await supabase
-            .from('roster_profiles')
-            .delete()
-            .eq('roster_id', editingRoster.id);
-
-          // Add new assignments
-          const rosterProfilesData = selectedProfiles.map(profileId => ({
-            roster_id: editingRoster.id,
-            profile_id: profileId
-          }));
-
-          await supabase
-            .from('roster_profiles')
-            .insert(rosterProfilesData);
-        }
-
         toast({ title: "Success", description: "Roster updated successfully" });
       } else {
-        const { data: newRoster, error } = await supabase
+        const { error } = await supabase
           .from('rosters')
-          .insert([rosterData])
-          .select()
-          .single();
-
+          .insert(formattedData);
         if (error) throw error;
-
-        // Add roster profile assignments
-        if (selectedProfiles.length > 0) {
-          const rosterProfilesData = selectedProfiles.map(profileId => ({
-            roster_id: newRoster.id,
-            profile_id: profileId
-          }));
-
-          await supabase
-            .from('roster_profiles')
-            .insert(rosterProfilesData);
-        }
-
-        toast({ title: "Success", description: "Roster added successfully" });
+        toast({ title: "Success", description: "Roster(s) created successfully" });
       }
 
-      setIsDialogOpen(false);
+      setFormData([
+        {
+          profile_id: '',
+          client_id: '',
+          project_id: '',
+          date: new Date().toISOString().split('T')[0],
+          start_time: '09:00',
+          end_time: '17:00',
+          total_hours: 8,
+          status: 'pending',
+          notes: '',
+          is_locked: false,
+          name: '',
+          expected_profiles: 1,
+          per_hour_rate: 0,
+          is_editable: true,
+          end_date: new Date().toISOString().split('T')[0],
+        }
+      ]);
       setEditingRoster(null);
-      setSelectedProfiles([]);
-      setFormData({
-        name: "",
-        profile_id: "",
-        client_id: "",
-        project_id: "",
-        date: "",
-        end_date: "",
-        start_time: "",
-        end_time: "",
-        total_hours: 0,
-        notes: "",
-        status: "pending",
-        expected_profiles: 1,
-        per_hour_rate: 0
-      });
-      fetchRosters();
+      fetchData();
     } catch (error) {
       console.error('Error saving roster:', error);
       toast({
@@ -231,390 +279,270 @@ export const RosterComponent = () => {
     }
   };
 
-  const handleEdit = (roster: Roster) => {
-    setEditingRoster(roster);
-    setFormData({
-      name: roster.name || "",
-      profile_id: roster.profile_id,
-      client_id: roster.client_id,
-      project_id: roster.project_id,
-      date: roster.date,
-      end_date: roster.end_date || "",
-      start_time: roster.start_time,
-      end_time: roster.end_time,
-      total_hours: roster.total_hours,
-      notes: roster.notes || "",
-      status: roster.status,
-      expected_profiles: roster.expected_profiles || 1,
-      per_hour_rate: roster.per_hour_rate || 0
-    });
-    
-    // Set selected profiles for editing
-    const assignedProfiles = roster.roster_profiles?.map(rp => rp.profile_id) || [];
-    setSelectedProfiles(assignedProfiles);
-    
-    setIsDialogOpen(true);
-  };
-
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this roster?")) return;
-
-    try {
-      const { error } = await supabase
-        .from('rosters')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-      toast({ title: "Success", description: "Roster deleted successfully" });
-      fetchRosters();
-    } catch (error) {
-      console.error('Error deleting roster:', error);
-      toast({
-        title: "Error",
-        description: "Failed to delete roster",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const filteredRosters = rosters.filter(roster =>
-    (roster.name && roster.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    roster.clients?.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    roster.projects?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    roster.profiles?.full_name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "confirmed":
-        return "default";
-      case "pending":
-        return "secondary";
-      case "cancelled":
-        return "destructive";
-      default:
-        return "secondary";
-    }
-  };
-
-  if (loading && rosters.length === 0) {
-    return <div className="flex justify-center items-center h-64">Loading...</div>;
-  }
+  // Filter rosters by week if filter is set
+  const filteredRosters = weekFilter.start && weekFilter.end 
+    ? rosters.filter(roster => {
+        const rosterDate = new Date(roster.date);
+        const startDate = new Date(weekFilter.start);
+        const endDate = new Date(weekFilter.end);
+        return rosterDate >= startDate && rosterDate <= endDate;
+      })
+    : rosters;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-gray-900">Roster Management</h1>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="flex items-center gap-2" onClick={() => {
-              setEditingRoster(null);
-              setSelectedProfiles([]);
-              setFormData({
-                name: "",
-                profile_id: "",
-                client_id: "",
-                project_id: "",
-                date: "",
-                end_date: "",
-                start_time: "",
-                end_time: "",
-                total_hours: 0,
-                notes: "",
-                status: "pending",
-                expected_profiles: 1,
-                per_hour_rate: 0
-              });
-            }}>
-              <Plus className="h-4 w-4" />
-              Add Roster
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>{editingRoster ? "Edit Roster" : "Add New Roster"}</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="name">Roster Name</Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="Optional roster name"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="expected_profiles">Expected Profiles</Label>
-                  <Input
-                    id="expected_profiles"
-                    type="number"
-                    min="1"
-                    value={formData.expected_profiles}
-                    onChange={(e) => setFormData({ ...formData, expected_profiles: parseInt(e.target.value) || 1 })}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <Label>Assign Profiles</Label>
-                <MultipleProfileSelector
-                  profiles={profiles}
-                  selectedProfiles={selectedProfiles}
-                  onSelectionChange={setSelectedProfiles}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="client_id">Client</Label>
-                  <Select value={formData.client_id} onValueChange={(value) => setFormData({ ...formData, client_id: value })}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a client" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {clients.map((client) => (
-                        <SelectItem key={client.id} value={client.id}>
-                          {client.company} ({client.name})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="project_id">Project</Label>
-                  <Select value={formData.project_id} onValueChange={(value) => setFormData({ ...formData, project_id: value })}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a project" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {projects.map((project) => (
-                        <SelectItem key={project.id} value={project.id}>
-                          {project.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="date">Start Date</Label>
-                  <Input
-                    id="date"
-                    type="date"
-                    value={formData.date}
-                    onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="end_date">End Date (Optional)</Label>
-                  <Input
-                    id="end_date"
-                    type="date"
-                    value={formData.end_date}
-                    onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <Label htmlFor="start_time">Start Time</Label>
-                  <Input
-                    id="start_time"
-                    type="time"
-                    value={formData.start_time}
-                    onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="end_time">End Time</Label>
-                  <Input
-                    id="end_time"
-                    type="time"
-                    value={formData.end_time}
-                    onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="total_hours">Total Hours</Label>
-                  <Input
-                    id="total_hours"
-                    type="number"
-                    step="0.5"
-                    value={formData.total_hours}
-                    onChange={(e) => setFormData({ ...formData, total_hours: parseFloat(e.target.value) || 0 })}
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="per_hour_rate">Per Hour Rate</Label>
-                  <Input
-                    id="per_hour_rate"
-                    type="number"
-                    step="0.01"
-                    value={formData.per_hour_rate}
-                    onChange={(e) => setFormData({ ...formData, per_hour_rate: parseFloat(e.target.value) || 0 })}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="status">Status</Label>
-                  <Select value={formData.status} onValueChange={(value: RosterStatus) => setFormData({ ...formData, status: value })}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="pending">Pending</SelectItem>
-                      <SelectItem value="confirmed">Confirmed</SelectItem>
-                      <SelectItem value="cancelled">Cancelled</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="notes">Notes</Label>
-                <Textarea
-                  id="notes"
-                  value={formData.notes}
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  placeholder="Additional notes..."
-                />
-              </div>
-
-              <Button type="submit" disabled={loading}>
-                {loading ? "Saving..." : editingRoster ? "Update Roster" : "Add Roster"}
-              </Button>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Total Rosters</CardTitle>
-            <Calendar className="h-5 w-5 text-blue-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-gray-900">{rosters.length}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Confirmed</CardTitle>
-            <Calendar className="h-5 w-5 text-green-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-gray-900">
-              {rosters.filter(r => r.status === "confirmed").length}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Pending</CardTitle>
-            <Calendar className="h-5 w-5 text-yellow-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-gray-900">
-              {rosters.filter(r => r.status === "pending").length}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Total Profiles</CardTitle>
-            <Users className="h-5 w-5 text-purple-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-gray-900">{profiles.length}</div>
-          </CardContent>
-        </Card>
-      </div>
-
+    <div className="container mx-auto py-8">
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>Rosters</CardTitle>
-            <div className="relative w-64">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-              <Input
-                placeholder="Search rosters..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-          </div>
+          <CardTitle className="text-2xl">Roster Management</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">Name</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">Client</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">Project</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">Date</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">Time</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">Assigned</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">Status</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredRosters.map((roster) => (
-                  <tr key={roster.id} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="py-3 px-4 font-medium text-gray-900">
-                      {roster.name || `Roster ${roster.date}`}
-                    </td>
-                    <td className="py-3 px-4 text-gray-600">{roster.clients?.company}</td>
-                    <td className="py-3 px-4 text-gray-600">{roster.projects?.name}</td>
-                    <td className="py-3 px-4 text-gray-600">
-                      {roster.date} {roster.end_date && roster.end_date !== roster.date && `- ${roster.end_date}`}
-                    </td>
-                    <td className="py-3 px-4 text-gray-600">
-                      {roster.start_time} - {roster.end_time} ({roster.total_hours}h)
-                    </td>
-                    <td className="py-3 px-4 text-gray-600">
-                      {roster.roster_profiles?.length || 0} / {roster.expected_profiles || 1}
-                    </td>
-                    <td className="py-3 px-4">
-                      <Badge variant={getStatusColor(roster.status)}>
-                        {roster.status}
-                      </Badge>
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-2">
-                        <Button variant="ghost" size="sm" onClick={() => handleEdit(roster)}>
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700" onClick={() => handleDelete(roster.id)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="mb-4 flex items-center justify-between">
+            <Button onClick={() => setIsCalendarView(!isCalendarView)}>
+              {isCalendarView ? 'Show Form View' : 'Show Calendar View'}
+            </Button>
+            {!isCalendarView && (
+              <RosterWeeklyFilter onWeekChange={handleWeekChange} />
+            )}
           </div>
+
+          {isCalendarView ? (
+            <EnhancedRosterCalendarView rosters={rosters} />
+          ) : (
+            <>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                {formData.map((data, index) => (
+                  <div key={index} className="border p-4 rounded-md">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor={`profile_id-${index}`}>Profile</Label>
+                        <Select
+                          value={data.profile_id}
+                          onValueChange={(value) => handleSelectChange(index, 'profile_id', value)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select profile" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {profiles.map(profile => (
+                              <SelectItem key={profile.id} value={profile.id}>{profile.full_name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label htmlFor={`client_id-${index}`}>Client</Label>
+                        <Select
+                          value={data.client_id}
+                          onValueChange={(value) => handleSelectChange(index, 'client_id', value)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select client" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {clients.map(client => (
+                              <SelectItem key={client.id} value={client.id}>{client.company}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label htmlFor={`project_id-${index}`}>Project</Label>
+                        <Select
+                          value={data.project_id}
+                          onValueChange={(value) => handleSelectChange(index, 'project_id', value)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select project" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {projects.map(project => (
+                              <SelectItem key={project.id} value={project.id}>{project.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label htmlFor={`status-${index}`}>Status</Label>
+                        <Select
+                          value={data.status}
+                          onValueChange={(value) => handleSelectChange(index, 'status', value)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select status" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="pending">Pending</SelectItem>
+                            <SelectItem value="confirmed">Confirmed</SelectItem>
+                            <SelectItem value="cancelled">Cancelled</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label htmlFor={`date-${index}`}>Date</Label>
+                        <Input
+                          type="date"
+                          name="date"
+                          value={data.date}
+                          onChange={(e) => handleInputChange(index, e)}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor={`end_date-${index}`}>End Date</Label>
+                        <Input
+                          type="date"
+                          name="end_date"
+                          value={data.end_date}
+                          onChange={(e) => handleInputChange(index, e)}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor={`start_time-${index}`}>Start Time</Label>
+                        <Input
+                          type="time"
+                          name="start_time"
+                          value={data.start_time}
+                          onChange={(e) => handleDateTimeChange(index, 'start_time', e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor={`end_time-${index}`}>End Time</Label>
+                        <Input
+                          type="time"
+                          name="end_time"
+                          value={data.end_time}
+                          onChange={(e) => handleDateTimeChange(index, 'end_time', e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor={`total_hours-${index}`}>Total Hours</Label>
+                        <Input
+                          type="number"
+                          name="total_hours"
+                          value={data.total_hours}
+                          readOnly
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor={`expected_profiles-${index}`}>Expected Profiles</Label>
+                        <Input
+                          type="number"
+                          name="expected_profiles"
+                          value={data.expected_profiles}
+                          onChange={(e) => handleInputChange(index, e)}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor={`per_hour_rate-${index}`}>Per Hour Rate</Label>
+                        <Input
+                          type="number"
+                          name="per_hour_rate"
+                          value={data.per_hour_rate}
+                          onChange={(e) => handleInputChange(index, e)}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor={`name-${index}`}>Name</Label>
+                        <Input
+                          type="text"
+                          name="name"
+                          value={data.name}
+                          onChange={(e) => handleInputChange(index, e)}
+                        />
+                      </div>
+                    </div>
+                    <Label htmlFor={`notes-${index}`}>Notes</Label>
+                    <Textarea
+                      name="notes"
+                      value={data.notes}
+                      onChange={(e) => handleInputChange(index, e)}
+                    />
+                    <div className="flex justify-end mt-2">
+                      <Button type="button" variant="destructive" size="sm" onClick={() => handleRemoveRoster(index)}>
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Remove
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+
+                <Button type="button" variant="secondary" onClick={handleAddRoster} className="flex items-center gap-2">
+                  <Plus className="h-4 w-4" />
+                  Add Roster
+                </Button>
+
+                <Button type="submit" disabled={loading} className="w-full">
+                  {loading ? "Saving..." : editingRoster ? "Update Roster" : "Create Roster(s)"}
+                </Button>
+              </form>
+
+              {filteredRosters.length > 0 && (
+                <div className="mt-6">
+                  <h3 className="text-xl font-semibold mb-2">
+                    {weekFilter.start ? 'Filtered Rosters' : 'Existing Rosters'} ({filteredRosters.length})
+                  </h3>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Profile
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Client
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Project
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Date
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Status
+                          </th>
+                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Actions
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {filteredRosters.map((roster) => (
+                          <tr key={roster.id}>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              {roster.profiles?.full_name}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              {roster.clients?.company}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              {roster.projects?.name}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              {new Date(roster.date).toLocaleDateString()}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              {roster.status}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-right">
+                              <RosterActions
+                                roster={roster}
+                                onEdit={handleEditRoster}
+                                onDelete={handleDeleteRoster}
+                                onView={handleViewRoster}
+                              />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
         </CardContent>
       </Card>
     </div>
   );
 };
+
+export default RosterManagement;

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -32,6 +31,7 @@ export const SalarySheetManager = ({ payrolls: initialPayrolls, profiles, onRefr
   const [selectedPayrolls, setSelectedPayrolls] = useState<string[]>([]);
   const [selectedPayrollForView, setSelectedPayrollForView] = useState<Payroll | null>(null);
   const [showPayrollDetails, setShowPayrollDetails] = useState(false);
+  const [bankBalance, setBankBalance] = useState<number>(0);
   const { toast } = useToast();
 
   // Update local payrolls when prop changes
@@ -44,6 +44,12 @@ export const SalarySheetManager = ({ payrolls: initialPayrolls, profiles, onRefr
     fetchBankAccounts();
     loadSavedBankAccount();
   }, [payrolls]);
+
+  useEffect(() => {
+    if (selectedBankAccount) {
+      fetchBankBalance();
+    }
+  }, [selectedBankAccount]);
 
   const fetchBankAccounts = async () => {
     try {
@@ -58,6 +64,42 @@ export const SalarySheetManager = ({ payrolls: initialPayrolls, profiles, onRefr
       setBankAccounts(data || []);
     } catch (error) {
       console.error('Error fetching bank accounts:', error);
+    }
+  };
+
+  const fetchBankBalance = async () => {
+    if (!selectedBankAccount) {
+      setBankBalance(0);
+      return;
+    }
+
+    try {
+      // Get bank account opening balance
+      const { data: bankAccount, error: bankError } = await supabase
+        .from('bank_accounts')
+        .select('opening_balance')
+        .eq('id', selectedBankAccount)
+        .single();
+
+      if (bankError) throw bankError;
+
+      // Get all transactions for this bank account
+      const { data: transactions, error: transError } = await supabase
+        .from('bank_transactions')
+        .select('amount, type')
+        .eq('bank_account_id', selectedBankAccount);
+
+      if (transError) throw transError;
+
+      // Calculate current balance
+      const transactionBalance = transactions.reduce((sum, t) => 
+        sum + (t.type === 'deposit' ? t.amount : -t.amount), 0
+      );
+
+      setBankBalance(bankAccount.opening_balance + transactionBalance);
+    } catch (error) {
+      console.error('Error fetching bank balance:', error);
+      setBankBalance(0);
     }
   };
 
@@ -104,6 +146,32 @@ export const SalarySheetManager = ({ payrolls: initialPayrolls, profiles, onRefr
   const totalNetPay = searchFilteredPayrolls.reduce((sum, p) => sum + p.net_pay, 0);
   const totalHours = searchFilteredPayrolls.reduce((sum, p) => sum + p.total_hours, 0);
 
+  // Get payrolls that can be approved (pending status)
+  const approvablePayrolls = searchFilteredPayrolls.filter(p => p.status === 'pending');
+  const selectedApprovablePayrolls = selectedPayrolls.filter(id => 
+    approvablePayrolls.some(p => p.id === id)
+  );
+
+  // Get payrolls that can be paid (approved status)
+  const payablePayrolls = searchFilteredPayrolls.filter(p => p.status === 'approved');
+  const selectedPayablePayrolls = selectedPayrolls.filter(id => 
+    payablePayrolls.some(p => p.id === id)
+  );
+
+  // Calculate total amount for selected payable payrolls
+  const totalSelectedPayableAmount = selectedPayablePayrolls.reduce((sum, id) => {
+    const payroll = payablePayrolls.find(p => p.id === id);
+    return sum + (payroll?.net_pay || 0);
+  }, 0);
+
+  // Check if bulk approve is disabled
+  const isBulkApproveDisabled = selectedApprovablePayrolls.length === 0;
+
+  // Check if bulk payment is disabled (no payable payrolls selected OR insufficient bank balance)
+  const isBulkPaymentDisabled = selectedPayablePayrolls.length === 0 || 
+    !selectedBankAccount || 
+    bankBalance < totalSelectedPayableAmount;
+
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
       setSelectedPayrolls(searchFilteredPayrolls.map(p => p.id));
@@ -121,28 +189,73 @@ export const SalarySheetManager = ({ payrolls: initialPayrolls, profiles, onRefr
   };
 
   const handleBulkAction = async (action: 'approve' | 'pay') => {
-    const status = action === 'approve' ? 'approved' : 'paid';
-    const confirmMessage = action === 'approve' 
-      ? `Mark ${selectedPayrolls.length} payrolls as approved?`
-      : `Mark ${selectedPayrolls.length} payrolls as paid?`;
-
-    if (!confirm(confirmMessage)) return;
-
-    try {
-      for (const payrollId of selectedPayrolls) {
-        await updatePayrollStatus(payrollId, status, selectedBankAccount);
+    if (action === 'approve') {
+      if (selectedApprovablePayrolls.length === 0) {
+        toast({
+          title: "No Payrolls to Approve",
+          description: "Please select payrolls with pending status to approve",
+          variant: "destructive"
+        });
+        return;
       }
-      setSelectedPayrolls([]);
-      toast({
-        title: "Success",
-        description: `${selectedPayrolls.length} payrolls marked as ${status}`
-      });
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: "Failed to update payrolls",
-        variant: "destructive"
-      });
+
+      const confirmMessage = `Mark ${selectedApprovablePayrolls.length} payrolls as approved?`;
+      if (!confirm(confirmMessage)) return;
+
+      try {
+        for (const payrollId of selectedApprovablePayrolls) {
+          await updatePayrollStatus(payrollId, 'approved');
+        }
+        setSelectedPayrolls([]);
+        toast({
+          title: "Success",
+          description: `${selectedApprovablePayrolls.length} payrolls marked as approved`
+        });
+      } catch (error: any) {
+        toast({
+          title: "Error",
+          description: "Failed to approve payrolls",
+          variant: "destructive"
+        });
+      }
+    } else if (action === 'pay') {
+      if (selectedPayablePayrolls.length === 0) {
+        toast({
+          title: "No Payrolls to Pay",
+          description: "Please select payrolls with approved status to mark as paid",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      if (bankBalance < totalSelectedPayableAmount) {
+        toast({
+          title: "Insufficient Bank Balance",
+          description: `Bank balance ($${bankBalance.toFixed(2)}) is insufficient for selected payments ($${totalSelectedPayableAmount.toFixed(2)})`,
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const confirmMessage = `Mark ${selectedPayablePayrolls.length} payrolls as paid? Total amount: $${totalSelectedPayableAmount.toFixed(2)}`;
+      if (!confirm(confirmMessage)) return;
+
+      try {
+        for (const payrollId of selectedPayablePayrolls) {
+          await updatePayrollStatus(payrollId, 'paid', selectedBankAccount);
+        }
+        setSelectedPayrolls([]);
+        toast({
+          title: "Success",
+          description: `${selectedPayablePayrolls.length} payrolls marked as paid`
+        });
+      } catch (error: any) {
+        toast({
+          title: "Error",
+          description: "Failed to mark payrolls as paid",
+          variant: "destructive"
+        });
+      }
     }
   };
 
@@ -452,7 +565,7 @@ export const SalarySheetManager = ({ payrolls: initialPayrolls, profiles, onRefr
                       </div>
                       {selectedBankAccount && (
                         <div className="mt-2 text-xs text-gray-500">
-                          All payments will be processed from: {getSelectedBankName()}
+                          Bank Balance: ${bankBalance.toFixed(2)} | Selected: {getSelectedBankName()}
                         </div>
                       )}
                     </CardContent>
@@ -468,12 +581,23 @@ export const SalarySheetManager = ({ payrolls: initialPayrolls, profiles, onRefr
                       <div className="flex items-center justify-between">
                         <div className="text-sm font-medium">
                           {selectedPayrolls.length} payroll(s) selected
+                          {selectedApprovablePayrolls.length > 0 && (
+                            <span className="text-blue-600 ml-2">
+                              ({selectedApprovablePayrolls.length} approvable)
+                            </span>
+                          )}
+                          {selectedPayablePayrolls.length > 0 && (
+                            <span className="text-green-600 ml-2">
+                              ({selectedPayablePayrolls.length} payable - ${totalSelectedPayableAmount.toFixed(2)})
+                            </span>
+                          )}
                         </div>
                         <div className="flex gap-2">
                           <Button
                             size="sm"
                             variant="outline"
                             onClick={() => handleBulkAction('approve')}
+                            disabled={isBulkApproveDisabled}
                           >
                             <Check className="h-4 w-4 mr-1" />
                             Bulk Approve
@@ -481,13 +605,18 @@ export const SalarySheetManager = ({ payrolls: initialPayrolls, profiles, onRefr
                           <Button
                             size="sm"
                             onClick={() => handleBulkAction('pay')}
-                            disabled={!selectedBankAccount}
+                            disabled={isBulkPaymentDisabled}
                           >
                             <DollarSign className="h-4 w-4 mr-1" />
                             Bulk Mark as Paid
                           </Button>
                         </div>
                       </div>
+                      {isBulkPaymentDisabled && selectedPayablePayrolls.length > 0 && bankBalance < totalSelectedPayableAmount && (
+                        <div className="mt-2 text-xs text-red-500">
+                          Insufficient bank balance for selected payments
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 </div>
@@ -636,9 +765,8 @@ export const SalarySheetManager = ({ payrolls: initialPayrolls, profiles, onRefr
       {/* Payroll Details Dialog */}
       <PayrollDetailsDialog
         payroll={selectedPayrollForView}
-        open={showPayrollDetails}
-        onOpenChange={setShowPayrollDetails}
-        onRefresh={onRefresh}
+        isOpen={showPayrollDetails}
+        onClose={() => setShowPayrollDetails(false)}
       />
     </div>
   );
