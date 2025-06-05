@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -230,14 +229,20 @@ const WorkingHours = () => {
     }
   };
 
-  const handleEdit = (workingHour: WorkingHour) => {
-    setEditingWorkingHour(workingHour);
-    setIsEditDialogOpen(true);
+  const handleEdit = (id: string) => {
+    const workingHour = workingHours.find(wh => wh.id === id);
+    if (workingHour) {
+      setEditingWorkingHour(workingHour);
+      setIsEditDialogOpen(true);
+    }
   };
 
-  const handleView = (workingHour: WorkingHour) => {
-    setEditingWorkingHour(workingHour);
-    setIsEditDialogOpen(true);
+  const handleView = (id: string) => {
+    const workingHour = workingHours.find(wh => wh.id === id);
+    if (workingHour) {
+      setEditingWorkingHour(workingHour);
+      setIsEditDialogOpen(true);
+    }
   };
 
   const handleDelete = async (id: string) => {

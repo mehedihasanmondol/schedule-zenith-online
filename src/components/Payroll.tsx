@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -265,6 +264,41 @@ export const PayrollComponent = () => {
     // We can pass this function to both tabs
   };
 
+  const handleEdit = (id: string) => {
+    // For now, just show a toast - this can be implemented later
+    toast({
+      title: "Edit Payroll",
+      description: "Edit functionality will be implemented soon",
+    });
+  };
+
+  const handleDelete = async (id: string) => {
+    if (window.confirm("Are you sure you want to delete this payroll record?")) {
+      try {
+        const { error } = await supabase
+          .from('payroll')
+          .delete()
+          .eq('id', id);
+
+        if (error) throw error;
+        
+        toast({
+          title: "Success",
+          description: "Payroll record deleted successfully"
+        });
+        
+        fetchPayrolls();
+      } catch (error) {
+        console.error('Error deleting payroll:', error);
+        toast({
+          title: "Error",
+          description: "Failed to delete payroll record",
+          variant: "destructive"
+        });
+      }
+    }
+  };
+
   if (loading && payrolls.length === 0) {
     return <div className="flex justify-center items-center h-64">Loading...</div>;
   }
@@ -346,6 +380,8 @@ export const PayrollComponent = () => {
             onMarkAsPaid={handleMarkAsPaid}
             onApprove={(id) => updatePayrollStatus(id, "approved")}
             onCreatePayroll={() => {}} // This will open the PayrollQuickGenerate dialog
+            onEdit={handleEdit}
+            onDelete={handleDelete}
             loading={loading}
           />
         </TabsContent>
