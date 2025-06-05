@@ -1,5 +1,5 @@
 
-import { EnhancedActionDropdown } from "@/components/ui/enhanced-action-dropdown";
+import { ActionDropdown } from "@/components/ui/action-dropdown";
 import { Edit, Trash2, Eye } from "lucide-react";
 
 interface SalarySheet {
@@ -45,5 +45,5 @@ export const SalarySheetActions = ({
     );
   }
 
-  return <EnhancedActionDropdown items={items} />;
+  return <ActionDropdown items={items} />;
 };

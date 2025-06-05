@@ -1,11 +1,12 @@
 
 import { Button } from "@/components/ui/button";
-import { EnhancedActionDropdown } from "@/components/ui/enhanced-action-dropdown";
+import { ActionDropdown } from "@/components/ui/action-dropdown";
 import { Check, Edit, Trash2, Eye } from "lucide-react";
 
 interface WorkingHour {
   id: string;
   status: string;
+  // Add other properties as needed
 }
 
 interface WorkingHoursActionsProps {
@@ -34,7 +35,7 @@ export const WorkingHoursActions = ({
           <Check className="h-4 w-4 mr-1" />
           Mark as Approved
         </Button>
-        <EnhancedActionDropdown
+        <ActionDropdown
           items={[
             {
               label: "Edit",
@@ -58,9 +59,8 @@ export const WorkingHoursActions = ({
     );
   }
 
-  // For approved/paid records, only show view details
   return (
-    <EnhancedActionDropdown
+    <ActionDropdown
       items={[
         {
           label: "View Details",
