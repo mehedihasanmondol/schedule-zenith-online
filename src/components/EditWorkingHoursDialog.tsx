@@ -47,8 +47,10 @@ export const EditWorkingHoursDialog = ({
     status: "pending" as WorkingHoursStatus
   });
 
+  // Reset form whenever workingHour changes or dialog opens/closes
   useEffect(() => {
-    if (workingHour) {
+    console.log('EditWorkingHoursDialog: workingHour changed', workingHour?.id);
+    if (workingHour && isOpen) {
       setFormData({
         profile_id: workingHour.profile_id,
         client_id: workingHour.client_id,
@@ -56,14 +58,29 @@ export const EditWorkingHoursDialog = ({
         date: workingHour.date,
         start_time: workingHour.start_time,
         end_time: workingHour.end_time,
-        sign_in_time: "", // Always start with empty sign in time
-        sign_out_time: "", // Always start with empty sign out time
+        sign_in_time: workingHour.sign_in_time || "",
+        sign_out_time: workingHour.sign_out_time || "",
         hourly_rate: workingHour.hourly_rate || 0,
         notes: workingHour.notes || "",
         status: workingHour.status
       });
+    } else if (!isOpen) {
+      // Reset form when dialog closes
+      setFormData({
+        profile_id: "",
+        client_id: "",
+        project_id: "",
+        date: "",
+        start_time: "",
+        end_time: "",
+        sign_in_time: "",
+        sign_out_time: "",
+        hourly_rate: 0,
+        notes: "",
+        status: "pending"
+      });
     }
-  }, [workingHour]);
+  }, [workingHour, isOpen]);
 
   const calculateTotalHours = (startTime: string, endTime: string) => {
     if (!startTime || !endTime) return 0;
@@ -104,6 +121,8 @@ export const EditWorkingHoursDialog = ({
         sign_out_time: formData.sign_out_time || null
       };
       
+      console.log('Updating working hour with ID:', workingHour.id, 'Data:', updateData);
+      
       const { error } = await supabase
         .from('working_hours')
         .update(updateData)
@@ -136,7 +155,7 @@ export const EditWorkingHoursDialog = ({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Edit Working Hours</DialogTitle>
+          <DialogTitle>Edit Working Hours - {workingHour.profiles?.full_name}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <ProfileSelector

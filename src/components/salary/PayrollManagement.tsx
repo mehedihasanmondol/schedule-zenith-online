@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,6 +9,7 @@ import { Plus, Search, Calculator } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Payroll, Profile, WorkingHour, Client, Project, BankAccount } from "@/types/database";
 import { useToast } from "@/hooks/use-toast";
+import { PayrollActions } from "./PayrollActions";
 
 interface PayrollManagementProps {
   payrolls: Payroll[];
@@ -25,6 +25,7 @@ export const PayrollManagement = ({ payrolls, profiles, onRefresh }: PayrollMana
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingPayroll, setEditingPayroll] = useState<Payroll | null>(null);
   const { toast } = useToast();
 
   const [formData, setFormData] = useState({
@@ -37,6 +38,25 @@ export const PayrollManagement = ({ payrolls, profiles, onRefresh }: PayrollMana
   useEffect(() => {
     fetchAdditionalData();
   }, []);
+
+  // Reset form when dialog opens/closes or when editing payroll changes
+  useEffect(() => {
+    if (editingPayroll) {
+      setFormData({
+        profile_id: editingPayroll.profile_id,
+        pay_period_start: editingPayroll.pay_period_start,
+        pay_period_end: editingPayroll.pay_period_end,
+        bank_account_id: editingPayroll.bank_account_id || ""
+      });
+    } else {
+      setFormData({
+        profile_id: "",
+        pay_period_start: "",
+        pay_period_end: "",
+        bank_account_id: ""
+      });
+    }
+  }, [editingPayroll, isDialogOpen]);
 
   const fetchAdditionalData = async () => {
     try {
@@ -97,23 +117,97 @@ export const PayrollManagement = ({ payrolls, profiles, onRefresh }: PayrollMana
         status: 'pending' as const
       };
 
-      const { error } = await supabase.from('payroll').insert([payrollData]);
-      if (error) throw error;
+      if (editingPayroll) {
+        const { error } = await supabase
+          .from('payroll')
+          .update(payrollData)
+          .eq('id', editingPayroll.id);
+        if (error) throw error;
+        toast({ title: "Success", description: "Payroll updated successfully" });
+      } else {
+        const { error } = await supabase.from('payroll').insert([payrollData]);
+        if (error) throw error;
+        toast({ title: "Success", description: "Payroll created successfully" });
+      }
 
-      toast({ title: "Success", description: "Payroll created successfully" });
       setIsDialogOpen(false);
+      setEditingPayroll(null);
       setFormData({ profile_id: "", pay_period_start: "", pay_period_end: "", bank_account_id: "" });
       onRefresh();
     } catch (error: any) {
-      console.error('Error creating payroll:', error);
+      console.error('Error saving payroll:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to create payroll",
+        description: error.message || "Failed to save payroll",
         variant: "destructive"
       });
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleEdit = (id: string) => {
+    const payroll = payrolls.find(p => p.id === id);
+    if (payroll) {
+      setEditingPayroll(payroll);
+      setIsDialogOpen(true);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    const payroll = payrolls.find(p => p.id === id);
+    if (!payroll) return;
+
+    if (payroll.status === 'paid') {
+      toast({
+        title: "Cannot Delete",
+        description: "Cannot delete payroll that has already been paid",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!confirm('Are you sure you want to delete this payroll record?')) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('payroll')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Payroll deleted successfully"
+      });
+      onRefresh();
+    } catch (error: any) {
+      console.error('Error deleting payroll:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete payroll",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleView = (id: string) => {
+    const payroll = payrolls.find(p => p.id === id);
+    if (payroll) {
+      // For now, just show a toast - you can implement a proper view dialog later
+      toast({
+        title: "Payroll Details",
+        description: `${payroll.profiles?.full_name}: $${payroll.net_pay.toFixed(2)} net pay`
+      });
+    }
+  };
+
+  const handleCreateNew = () => {
+    setEditingPayroll(null);
+    setIsDialogOpen(true);
   };
 
   const filteredPayrolls = payrolls.filter(payroll =>
@@ -135,16 +229,21 @@ export const PayrollManagement = ({ payrolls, profiles, onRefresh }: PayrollMana
                 className="pl-10"
               />
             </div>
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <Dialog open={isDialogOpen} onOpenChange={(open) => {
+              setIsDialogOpen(open);
+              if (!open) setEditingPayroll(null);
+            }}>
               <DialogTrigger asChild>
-                <Button>
+                <Button onClick={handleCreateNew}>
                   <Plus className="h-4 w-4 mr-2" />
                   Create Payroll
                 </Button>
               </DialogTrigger>
               <DialogContent className="max-w-2xl">
                 <DialogHeader>
-                  <DialogTitle>Create New Payroll</DialogTitle>
+                  <DialogTitle>
+                    {editingPayroll ? 'Edit Payroll' : 'Create New Payroll'}
+                  </DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -205,7 +304,7 @@ export const PayrollManagement = ({ payrolls, profiles, onRefresh }: PayrollMana
                   </div>
 
                   <Button type="submit" disabled={loading} className="w-full">
-                    {loading ? "Creating..." : "Create Payroll"}
+                    {loading ? (editingPayroll ? "Updating..." : "Creating...") : (editingPayroll ? "Update Payroll" : "Create Payroll")}
                   </Button>
                 </form>
               </DialogContent>
@@ -225,6 +324,7 @@ export const PayrollManagement = ({ payrolls, profiles, onRefresh }: PayrollMana
                 <th className="text-left py-3 px-4 font-medium text-gray-600">Deductions</th>
                 <th className="text-left py-3 px-4 font-medium text-gray-600">Net Pay</th>
                 <th className="text-left py-3 px-4 font-medium text-gray-600">Status</th>
+                <th className="text-left py-3 px-4 font-medium text-gray-600">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -259,11 +359,19 @@ export const PayrollManagement = ({ payrolls, profiles, onRefresh }: PayrollMana
                       {payroll.status}
                     </span>
                   </td>
+                  <td className="py-3 px-4">
+                    <PayrollActions
+                      payroll={payroll}
+                      onEdit={handleEdit}
+                      onDelete={handleDelete}
+                      onView={handleView}
+                    />
+                  </td>
                 </tr>
               ))}
               {filteredPayrolls.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="text-center py-8 text-gray-500">
+                  <td colSpan={8} className="text-center py-8 text-gray-500">
                     <Calculator className="h-12 w-12 mx-auto mb-4 text-gray-300" />
                     <p>No payroll records found</p>
                     <p className="text-sm">Create a payroll to get started</p>
