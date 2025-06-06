@@ -10,6 +10,7 @@ import { PayrollDetailsDialog } from "@/components/salary/PayrollDetailsDialog";
 import { BankSelectionDialog } from "@/components/payroll/BankSelectionDialog";
 import { PayrollListWithFilters } from "@/components/payroll/PayrollListWithFilters";
 import { PayrollQuickGenerate } from "@/components/payroll/PayrollQuickGenerate";
+import { PayrollEditDialog } from "@/components/payroll/PayrollEditDialog";
 
 export const PayrollComponent = () => {
   const [payrolls, setPayrolls] = useState<PayrollType[]>([]);
@@ -19,7 +20,9 @@ export const PayrollComponent = () => {
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedPayrollForView, setSelectedPayrollForView] = useState<PayrollType | null>(null);
+  const [selectedPayrollForEdit, setSelectedPayrollForEdit] = useState<PayrollType | null>(null);
   const [showPayrollDetails, setShowPayrollDetails] = useState(false);
+  const [showPayrollEdit, setShowPayrollEdit] = useState(false);
   const [selectedBankAccount, setSelectedBankAccount] = useState<string>("");
   const [showBankSelectionDialog, setShowBankSelectionDialog] = useState(false);
   const [selectedPayrollForPayment, setSelectedPayrollForPayment] = useState<PayrollType | null>(null);
@@ -265,12 +268,8 @@ export const PayrollComponent = () => {
   };
 
   const handleEditPayroll = (payroll: PayrollType) => {
-    // TODO: Implement edit payroll dialog/form
-    console.log('Edit payroll:', payroll);
-    toast({
-      title: "Edit Payroll",
-      description: "Edit payroll functionality will be implemented soon",
-    });
+    setSelectedPayrollForEdit(payroll);
+    setShowPayrollEdit(true);
   };
 
   const handleDeletePayroll = async (id: string) => {
@@ -493,6 +492,14 @@ export const PayrollComponent = () => {
         payroll={selectedPayrollForView}
         isOpen={showPayrollDetails}
         onClose={() => setShowPayrollDetails(false)}
+      />
+
+      {/* Payroll Edit Dialog */}
+      <PayrollEditDialog
+        payroll={selectedPayrollForEdit}
+        isOpen={showPayrollEdit}
+        onClose={() => setShowPayrollEdit(false)}
+        onSuccess={fetchPayrolls}
       />
 
       {/* Bank Selection Dialog */}
