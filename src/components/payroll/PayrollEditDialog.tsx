@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Clock, ChevronDown, ChevronUp } from "lucide-react";
+import { Clock, ChevronDown, ChevronUp, Zap } from "lucide-react";
 import type { Payroll as PayrollType, WorkingHour } from "@/types/database";
 
 interface PayrollEditDialogProps {
@@ -106,13 +106,14 @@ export const PayrollEditDialog = ({ payroll, isOpen, onClose, onSuccess }: Payro
     if (workingHours.length > 0) {
       const totalHours = workingHours.reduce((sum, wh) => sum + wh.total_hours, 0);
       const avgHourlyRate = workingHours.reduce((sum, wh) => sum + (wh.hourly_rate || 0), 0) / workingHours.length;
+      const grossPay = totalHours * avgHourlyRate;
       
       setFormData(prev => ({
         ...prev,
         total_hours: totalHours,
         hourly_rate: avgHourlyRate,
-        gross_pay: totalHours * avgHourlyRate,
-        net_pay: (totalHours * avgHourlyRate) - prev.deductions
+        gross_pay: grossPay,
+        net_pay: grossPay - prev.deductions
       }));
 
       toast({
@@ -192,8 +193,9 @@ export const PayrollEditDialog = ({ payroll, isOpen, onClose, onSuccess }: Payro
                 variant="outline"
                 size="sm"
                 onClick={recalculateFromWorkingHours}
-                className="w-full"
+                className="w-full flex items-center gap-2"
               >
+                <Zap className="h-4 w-4" />
                 Recalculate from Working Hours ({workingHours.length} entries)
               </Button>
             )}
@@ -282,6 +284,24 @@ export const PayrollEditDialog = ({ payroll, isOpen, onClose, onSuccess }: Payro
               />
             </div>
           </div>
+
+          {/* Real-time calculation preview */}
+          {formData.total_hours > 0 && formData.hourly_rate > 0 && (
+            <div className="bg-gray-50 p-3 rounded">
+              <div className="flex justify-between text-sm">
+                <span>Calculated Gross Pay:</span>
+                <span>${(formData.total_hours * formData.hourly_rate).toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span>Deductions:</span>
+                <span>-${formData.deductions.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between font-medium">
+                <span>Calculated Net Pay:</span>
+                <span>${(formData.total_hours * formData.hourly_rate - formData.deductions).toFixed(2)}</span>
+              </div>
+            </div>
+          )}
 
           <div>
             <Label htmlFor="status">Status</Label>
