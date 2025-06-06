@@ -1,13 +1,15 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import type { Payroll as PayrollType } from "@/types/database";
+import { Clock, ChevronDown, ChevronUp } from "lucide-react";
+import type { Payroll as PayrollType, WorkingHour } from "@/types/database";
 
 interface PayrollEditDialogProps {
   payroll: PayrollType | null;
@@ -18,21 +20,23 @@ interface PayrollEditDialogProps {
 
 export const PayrollEditDialog = ({ payroll, isOpen, onClose, onSuccess }: PayrollEditDialogProps) => {
   const [loading, setLoading] = useState(false);
+  const [workingHours, setWorkingHours] = useState<WorkingHour[]>([]);
+  const [isWorkingHoursPreviewOpen, setIsWorkingHoursPreviewOpen] = useState(false);
   const [formData, setFormData] = useState({
-    pay_period_start: payroll?.pay_period_start || "",
-    pay_period_end: payroll?.pay_period_end || "",
-    total_hours: payroll?.total_hours || 0,
-    hourly_rate: payroll?.hourly_rate || 0,
-    gross_pay: payroll?.gross_pay || 0,
-    deductions: payroll?.deductions || 0,
-    net_pay: payroll?.net_pay || 0,
-    status: payroll?.status || 'pending'
+    pay_period_start: "",
+    pay_period_end: "",
+    total_hours: 0,
+    hourly_rate: 0,
+    gross_pay: 0,
+    deductions: 0,
+    net_pay: 0,
+    status: 'pending' as const
   });
   const { toast } = useToast();
 
-  // Update form data when payroll changes
-  useState(() => {
-    if (payroll) {
+  // Populate form data when payroll changes
+  useEffect(() => {
+    if (payroll && isOpen) {
       setFormData({
         pay_period_start: payroll.pay_period_start,
         pay_period_end: payroll.pay_period_end,
@@ -43,8 +47,36 @@ export const PayrollEditDialog = ({ payroll, isOpen, onClose, onSuccess }: Payro
         net_pay: payroll.net_pay,
         status: payroll.status
       });
+      
+      // Fetch working hours for this payroll period
+      fetchWorkingHours();
     }
-  });
+  }, [payroll, isOpen]);
+
+  const fetchWorkingHours = async () => {
+    if (!payroll) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('working_hours')
+        .select(`
+          *,
+          clients!working_hours_client_id_fkey (id, name, company),
+          projects!working_hours_project_id_fkey (id, name)
+        `)
+        .eq('profile_id', payroll.profile_id)
+        .gte('date', payroll.pay_period_start)
+        .lte('date', payroll.pay_period_end)
+        .eq('status', 'approved')
+        .order('date', { ascending: false });
+
+      if (error) throw error;
+      setWorkingHours(data || []);
+      setIsWorkingHoursPreviewOpen(data && data.length > 0);
+    } catch (error) {
+      console.error('Error fetching working hours:', error);
+    }
+  };
 
   const handleInputChange = (field: string, value: string | number) => {
     setFormData(prev => {
@@ -68,6 +100,26 @@ export const PayrollEditDialog = ({ payroll, isOpen, onClose, onSuccess }: Payro
       
       return updated;
     });
+  };
+
+  const recalculateFromWorkingHours = () => {
+    if (workingHours.length > 0) {
+      const totalHours = workingHours.reduce((sum, wh) => sum + wh.total_hours, 0);
+      const avgHourlyRate = workingHours.reduce((sum, wh) => sum + (wh.hourly_rate || 0), 0) / workingHours.length;
+      
+      setFormData(prev => ({
+        ...prev,
+        total_hours: totalHours,
+        hourly_rate: avgHourlyRate,
+        gross_pay: totalHours * avgHourlyRate,
+        net_pay: (totalHours * avgHourlyRate) - prev.deductions
+      }));
+
+      toast({
+        title: "Recalculated",
+        description: "Payroll has been recalculated based on approved working hours"
+      });
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -116,12 +168,37 @@ export const PayrollEditDialog = ({ payroll, isOpen, onClose, onSuccess }: Payro
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Edit Payroll Record</DialogTitle>
+          <DialogTitle>Edit Payroll Record - {payroll.profiles?.full_name}</DialogTitle>
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="h-10 w-10 bg-blue-600 rounded-full flex items-center justify-center">
+                <span className="font-medium text-white">
+                  {payroll.profiles?.full_name?.split(' ').map(n => n[0]).join('') || 'U'}
+                </span>
+              </div>
+              <div>
+                <h3 className="font-medium text-blue-900">{payroll.profiles?.full_name}</h3>
+                <p className="text-sm text-blue-700">{payroll.profiles?.role}</p>
+              </div>
+            </div>
+            {workingHours.length > 0 && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={recalculateFromWorkingHours}
+                className="w-full"
+              >
+                Recalculate from Working Hours ({workingHours.length} entries)
+              </Button>
+            )}
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="pay_period_start">Pay Period Start</Label>
@@ -219,6 +296,44 @@ export const PayrollEditDialog = ({ payroll, isOpen, onClose, onSuccess }: Payro
               </SelectContent>
             </Select>
           </div>
+
+          {workingHours.length > 0 && (
+            <Collapsible open={isWorkingHoursPreviewOpen} onOpenChange={setIsWorkingHoursPreviewOpen}>
+              <CollapsibleTrigger asChild>
+                <Button type="button" variant="outline" className="w-full justify-between">
+                  <span className="flex items-center gap-2">
+                    <Clock className="h-4 w-4" />
+                    Working Hours Preview ({workingHours.length} entries)
+                  </span>
+                  {isWorkingHoursPreviewOpen ? (
+                    <ChevronUp className="h-4 w-4" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4" />
+                  )}
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="mt-3">
+                <div className="border rounded-lg p-4">
+                  <div className="max-h-40 overflow-y-auto space-y-2">
+                    {workingHours.map((wh) => (
+                      <div key={wh.id} className="flex justify-between items-center text-sm bg-gray-50 p-2 rounded">
+                        <div>
+                          <span className="font-medium">{new Date(wh.date).toLocaleDateString()}</span>
+                          <span className="text-gray-600 ml-2">
+                            {wh.clients?.company || 'N/A'} - {wh.projects?.name || 'N/A'}
+                          </span>
+                        </div>
+                        <div className="text-right">
+                          <div>{wh.total_hours}h × ${wh.hourly_rate}/hr</div>
+                          <div className="font-medium">${(wh.total_hours * (wh.hourly_rate || 0)).toFixed(2)}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+          )}
 
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={onClose}>

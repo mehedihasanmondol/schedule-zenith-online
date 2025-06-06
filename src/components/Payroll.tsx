@@ -377,10 +377,14 @@ export const PayrollComponent = () => {
             onViewPayroll={handleViewPayroll}
             onMarkAsPaid={handleMarkAsPaid}
             onApprove={(id) => updatePayrollStatus(id, "approved")}
-            onCreatePayroll={() => {}} // This will open the PayrollQuickGenerate dialog
+            onCreatePayroll={handleCreatePayroll}
             onEditPayroll={handleEditPayroll}
             onDeletePayroll={handleDeletePayroll}
             loading={loading}
+            profiles={profiles}
+            profilesWithHours={profilesWithHours}
+            workingHours={workingHours}
+            onRefresh={fetchPayrolls}
           />
         </TabsContent>
 

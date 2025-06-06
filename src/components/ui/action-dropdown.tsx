@@ -34,7 +34,7 @@ export const ActionDropdown = ({ items }: ActionDropdownProps) => {
             key={index}
             onClick={item.onClick}
             className={`flex items-center gap-2 ${
-              item.variant === "destructive" ? "text-red-600 hover:text-red-700" : ""
+              item.variant === "destructive" ? "text-red-600 hover:text-red-700 hover:bg-red-50" : "hover:bg-gray-50"
             }`}
           >
             {item.icon}

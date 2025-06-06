@@ -1,12 +1,14 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Search, Calendar, Plus } from "lucide-react";
+import { Search, Calendar } from "lucide-react";
 import { PayrollActions } from "./PayrollActions";
-import type { Payroll as PayrollType } from "@/types/database";
+import { PayrollCreateDialog } from "./PayrollCreateDialog";
+import type { Payroll as PayrollType, Profile, WorkingHour } from "@/types/database";
 
 interface PayrollListWithFiltersProps {
   payrolls: PayrollType[];
@@ -17,6 +19,10 @@ interface PayrollListWithFiltersProps {
   onEditPayroll?: (payroll: PayrollType) => void;
   onDeletePayroll?: (id: string) => void;
   loading: boolean;
+  profiles?: Profile[];
+  profilesWithHours?: Profile[];
+  workingHours?: WorkingHour[];
+  onRefresh?: () => void;
 }
 
 export const PayrollListWithFilters = ({ 
@@ -27,7 +33,11 @@ export const PayrollListWithFilters = ({
   onCreatePayroll,
   onEditPayroll,
   onDeletePayroll,
-  loading 
+  loading,
+  profiles = [],
+  profilesWithHours = [],
+  workingHours = [],
+  onRefresh = () => {}
 }: PayrollListWithFiltersProps) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -169,10 +179,19 @@ export const PayrollListWithFilters = ({
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle>Payroll Records</CardTitle>
-          <Button onClick={onCreatePayroll} className="flex items-center gap-2">
-            <Plus className="h-4 w-4" />
-            Create Payroll
-          </Button>
+          {profiles.length > 0 ? (
+            <PayrollCreateDialog
+              profiles={profiles}
+              profilesWithHours={profilesWithHours}
+              workingHours={workingHours}
+              onRefresh={onRefresh}
+            />
+          ) : (
+            <Button onClick={onCreatePayroll} className="flex items-center gap-2">
+              <Plus className="h-4 w-4" />
+              Create Payroll
+            </Button>
+          )}
         </div>
         
         {/* Filters */}
