@@ -30,7 +30,7 @@ export const PayrollEditDialog = ({ payroll, isOpen, onClose, onSuccess }: Payro
     gross_pay: 0,
     deductions: 0,
     net_pay: 0,
-    status: 'pending' as const
+    status: 'pending' as 'pending' | 'approved' | 'paid'
   });
   const { toast } = useToast();
 
@@ -61,7 +61,7 @@ export const PayrollEditDialog = ({ payroll, isOpen, onClose, onSuccess }: Payro
         .from('working_hours')
         .select(`
           *,
-          clients!working_hours_client_id_fkey (id, name, company),
+          clients!working_hours_client_id_fkey (id, name, company, email, status, created_at, updated_at),
           projects!working_hours_project_id_fkey (id, name)
         `)
         .eq('profile_id', payroll.profile_id)
@@ -71,7 +71,7 @@ export const PayrollEditDialog = ({ payroll, isOpen, onClose, onSuccess }: Payro
         .order('date', { ascending: false });
 
       if (error) throw error;
-      setWorkingHours(data || []);
+      setWorkingHours((data || []) as WorkingHour[]);
       setIsWorkingHoursPreviewOpen(data && data.length > 0);
     } catch (error) {
       console.error('Error fetching working hours:', error);
@@ -285,7 +285,7 @@ export const PayrollEditDialog = ({ payroll, isOpen, onClose, onSuccess }: Payro
 
           <div>
             <Label htmlFor="status">Status</Label>
-            <Select value={formData.status} onValueChange={(value) => handleInputChange('status', value)}>
+            <Select value={formData.status} onValueChange={(value: 'pending' | 'approved' | 'paid') => handleInputChange('status', value)}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>

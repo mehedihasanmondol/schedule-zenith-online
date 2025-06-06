@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Search, Calendar } from "lucide-react";
+import { Search, Calendar, Plus } from "lucide-react";
 import { PayrollActions } from "./PayrollActions";
 import { PayrollCreateDialog } from "./PayrollCreateDialog";
 import type { Payroll as PayrollType, Profile, WorkingHour } from "@/types/database";
