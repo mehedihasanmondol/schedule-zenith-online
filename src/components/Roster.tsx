@@ -1,88 +1,111 @@
-import React, { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
-import { Calendar, Clock, Users, Plus, Edit, Trash2 } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import type { Roster, Profile, Client, Project } from '@/types/database';
-import { EnhancedRosterCalendarView } from './roster/EnhancedRosterCalendarView';
-import { RosterWeeklyFilter } from './roster/RosterWeeklyFilter';
-import { RosterActions } from './roster/RosterActions';
+import { useState, useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Plus, Search, Calendar, Clock, Users, DollarSign, CalendarDays } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { Roster as RosterType, Profile, Client, Project, RosterProfile } from "@/types/database";
+import { useToast } from "@/hooks/use-toast";
+import { MultipleProfileSelector } from "@/components/common/MultipleProfileSelector";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { EnhancedRosterCalendarView } from "@/components/roster/EnhancedRosterCalendarView";
+import { RosterWeeklyFilter } from "@/components/roster/RosterWeeklyFilter";
+import { RosterActions } from "@/components/roster/RosterActions";
+import { format, startOfWeek, endOfWeek, isWithinInterval, parseISO } from "date-fns";
+import { RosterEditDialog } from "@/components/roster/RosterEditDialog";
+import { RosterViewDialog } from "@/components/roster/RosterViewDialog";
 
-const RosterManagement = () => {
-  const [rosters, setRosters] = useState<Roster[]>([]);
+export const RosterComponent = () => {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [rosters, setRosters] = useState<RosterType[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
-  const [formData, setFormData] = useState<Omit<Roster, 'id' | 'created_at' | 'updated_at'>[]>([
-    {
-      profile_id: '',
-      client_id: '',
-      project_id: '',
-      date: new Date().toISOString().split('T')[0],
-      start_time: '09:00',
-      end_time: '17:00',
-      total_hours: 8,
-      status: 'pending',
-      notes: '',
-      is_locked: false,
-      name: '',
-      expected_profiles: 1,
-      per_hour_rate: 0,
-      is_editable: true,
-      end_date: new Date().toISOString().split('T')[0],
-    }
-  ]);
-  const [loading, setLoading] = useState(false);
-  const [editingRoster, setEditingRoster] = useState<Roster | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("calendar");
+  const [currentWeek, setCurrentWeek] = useState(new Date());
   const { toast } = useToast();
-  const [isCalendarView, setIsCalendarView] = useState(false);
-  const [weekFilter, setWeekFilter] = useState({ start: '', end: '' });
+
+  const generateDefaultRosterName = () => {
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+    const timeStr = now.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    });
+    return `Roster ${dateStr} at ${timeStr}`;
+  };
+
+  const [formData, setFormData] = useState({
+    profile_ids: [] as string[],
+    client_id: "",
+    project_id: "",
+    date: "",
+    end_date: "",
+    start_time: "",
+    end_time: "",
+    notes: "",
+    status: "pending",
+    name: generateDefaultRosterName(),
+    expected_profiles: 1,
+    per_hour_rate: 0
+  });
+
+  const [editingRoster, setEditingRoster] = useState<RosterType | null>(null);
+  const [viewingRoster, setViewingRoster] = useState<RosterType | null>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
 
   useEffect(() => {
-    fetchData();
+    fetchRosters();
+    fetchProfiles();
+    fetchClients();
+    fetchProjects();
   }, []);
 
-  const fetchData = async () => {
-    setLoading(true);
+  const fetchRosters = async () => {
     try {
-      const { data: rostersData, error: rostersError } = await supabase
+      const { data, error } = await supabase
         .from('rosters')
         .select(`
           *,
-          profiles!rosters_profile_id_fkey (id, full_name, email, role, avatar_url, is_active, created_at, updated_at),
-          clients!rosters_client_id_fkey (id, name, company, email, status, created_at, updated_at),
-          projects!rosters_project_id_fkey (id, name, client_id, status, start_date, budget, created_at, updated_at)
-        `);
-      if (rostersError) throw rostersError;
-      setRosters(rostersData || []);
+          clients!rosters_client_id_fkey (id, company),
+          projects!rosters_project_id_fkey (id, name),
+          roster_profiles!roster_profiles_roster_id_fkey (
+            id,
+            profile_id,
+            profiles!roster_profiles_profile_id_fkey (id, full_name, role)
+          )
+        `)
+        .order('created_at', { ascending: false });
 
-      const { data: profilesData, error: profilesError } = await supabase
-        .from('profiles')
-        .select('*');
-      if (profilesError) throw profilesError;
-      setProfiles(profilesData || []);
-
-      const { data: clientsData, error: clientsError } = await supabase
-        .from('clients')
-        .select('*');
-      if (clientsError) throw clientsError;
-      setClients(clientsData || []);
-
-      const { data: projectsData, error: projectsError } = await supabase
-        .from('projects')
-        .select('*');
-      if (projectsError) throw projectsError;
-      setProjects(projectsData || []);
+      if (error) throw error;
+      
+      const rostersData = (data || []).map(roster => ({
+        ...roster,
+        clients: Array.isArray(roster.clients) ? roster.clients[0] : roster.clients,
+        projects: Array.isArray(roster.projects) ? roster.projects[0] : roster.projects,
+        roster_profiles: roster.roster_profiles || []
+      }));
+      
+      setRosters(rostersData as RosterType[]);
     } catch (error) {
-      console.error('Error fetching data:', error);
+      console.error('Error fetching rosters:', error);
       toast({
         title: "Error",
-        description: "Failed to fetch data",
+        description: "Failed to fetch rosters",
         variant: "destructive"
       });
     } finally {
@@ -90,135 +113,60 @@ const RosterManagement = () => {
     }
   };
 
-  const handleInputChange = (index: number, event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value } = event.target;
-    const newFormData = [...formData];
-    newFormData[index] = { ...newFormData[index], [name]: value };
-    setFormData(newFormData);
-  };
+  const fetchProfiles = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('is_active', true)
+        .order('full_name');
 
-  const handleSelectChange = (index: number, name: string, value: string) => {
-    const newFormData = [...formData];
-    newFormData[index] = { ...newFormData[index], [name]: value };
-    setFormData(newFormData);
-  };
-
-  const handleDateTimeChange = (index: number, name: string, value: string) => {
-    const newFormData = [...formData];
-    newFormData[index] = { ...newFormData[index], [name]: value };
-    setFormData(newFormData);
-
-    // Auto-calculate total_hours when start_time and end_time change
-    if (name === 'start_time' || name === 'end_time') {
-      const startTime = newFormData[index].start_time;
-      const endTime = newFormData[index].end_time;
-
-      if (startTime && endTime) {
-        const [startHours, startMinutes] = startTime.split(':').map(Number);
-        const [endHours, endMinutes] = endTime.split(':').map(Number);
-
-        const startTotalMinutes = startHours * 60 + startMinutes;
-        const endTotalMinutes = endHours * 60 + endMinutes;
-
-        let diffMinutes = endTotalMinutes - startTotalMinutes;
-        if (diffMinutes < 0) {
-          diffMinutes += 24 * 60; // Account for crossing midnight
-        }
-
-        const totalHours = diffMinutes / 60;
-        newFormData[index] = { ...newFormData[index], total_hours: parseFloat(totalHours.toFixed(2)) };
-        setFormData(newFormData);
-      }
+      if (error) throw error;
+      setProfiles(data as Profile[]);
+    } catch (error) {
+      console.error('Error fetching profiles:', error);
     }
   };
 
-  const handleAddRoster = () => {
-    setFormData([
-      ...formData,
-      {
-        profile_id: '',
-        client_id: '',
-        project_id: '',
-        date: new Date().toISOString().split('T')[0],
-        start_time: '09:00',
-        end_time: '17:00',
-        total_hours: 8,
-        status: 'pending',
-        notes: '',
-        is_locked: false,
-        name: '',
-        expected_profiles: 1,
-        per_hour_rate: 0,
-        is_editable: true,
-        end_date: new Date().toISOString().split('T')[0],
-      }
-    ]);
-  };
+  const fetchClients = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('clients')
+        .select('*')
+        .eq('status', 'active')
+        .order('company');
 
-  const handleRemoveRoster = (index: number) => {
-    const newFormData = [...formData];
-    newFormData.splice(index, 1);
-    setFormData(newFormData);
-  };
-
-  const handleEditRoster = (rosterId: string) => {
-    const roster = rosters.find(r => r.id === rosterId);
-    if (roster) {
-      setEditingRoster(roster);
-      setFormData([{
-        profile_id: roster.profile_id,
-        client_id: roster.client_id,
-        project_id: roster.project_id,
-        date: roster.date,
-        start_time: roster.start_time,
-        end_time: roster.end_time,
-        total_hours: roster.total_hours,
-        status: roster.status,
-        notes: roster.notes || '',
-        is_locked: roster.is_locked,
-        name: roster.name || '',
-        expected_profiles: roster.expected_profiles || 1,
-        per_hour_rate: roster.per_hour_rate || 0,
-        is_editable: roster.is_editable || true,
-        end_date: roster.end_date || new Date().toISOString().split('T')[0],
-      }]);
+      if (error) throw error;
+      setClients(data as Client[]);
+    } catch (error) {
+      console.error('Error fetching clients:', error);
     }
   };
 
-  const handleDeleteRoster = async (rosterId: string) => {
-    if (window.confirm("Are you sure you want to delete this roster?")) {
-      setLoading(true);
-      try {
-        const { error } = await supabase
-          .from('rosters')
-          .delete()
-          .eq('id', rosterId);
-        if (error) throw error;
-        toast({ title: "Success", description: "Roster deleted successfully" });
-        fetchData();
-      } catch (error) {
-        console.error('Error deleting roster:', error);
-        toast({
-          title: "Error",
-          description: "Failed to delete roster",
-          variant: "destructive"
-        });
-      } finally {
-        setLoading(false);
-      }
+  const fetchProjects = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('status', 'active')
+        .order('name');
+
+      if (error) throw error;
+      setProjects(data as Project[]);
+    } catch (error) {
+      console.error('Error fetching projects:', error);
     }
   };
 
-  const handleViewRoster = (rosterId: string) => {
-    const roster = rosters.find(r => r.id === rosterId);
-    if (roster) {
-      // For now, just edit - could be expanded to a view-only dialog
-      handleEditRoster(rosterId);
-    }
-  };
-
-  const handleWeekChange = (startDate: string, endDate: string) => {
-    setWeekFilter({ start: startDate, end: endDate });
+  const calculateTotalHours = (startTime: string, endTime: string) => {
+    if (!startTime || !endTime) return 0;
+    
+    const start = new Date(`2000-01-01T${startTime}`);
+    const end = new Date(`2000-01-01T${endTime}`);
+    const diffMs = end.getTime() - start.getTime();
+    const diffHours = diffMs / (1000 * 60 * 60);
+    
+    return Math.max(0, diffHours);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -226,47 +174,77 @@ const RosterManagement = () => {
     setLoading(true);
 
     try {
-      const formattedData = formData.map(data => ({
-        ...data,
-        status: data.status as 'pending' | 'confirmed' | 'cancelled'
-      }));
-
-      if (editingRoster) {
-        const { error } = await supabase
-          .from('rosters')
-          .update(formattedData[0])
-          .eq('id', editingRoster.id);
-        if (error) throw error;
-        toast({ title: "Success", description: "Roster updated successfully" });
-      } else {
-        const { error } = await supabase
-          .from('rosters')
-          .insert(formattedData);
-        if (error) throw error;
-        toast({ title: "Success", description: "Roster(s) created successfully" });
+      if (formData.profile_ids.length === 0) {
+        toast({
+          title: "Error",
+          description: "Please select at least one profile",
+          variant: "destructive"
+        });
+        return;
       }
 
-      setFormData([
-        {
-          profile_id: '',
-          client_id: '',
-          project_id: '',
-          date: new Date().toISOString().split('T')[0],
-          start_time: '09:00',
-          end_time: '17:00',
-          total_hours: 8,
-          status: 'pending',
-          notes: '',
-          is_locked: false,
-          name: '',
-          expected_profiles: 1,
-          per_hour_rate: 0,
-          is_editable: true,
-          end_date: new Date().toISOString().split('T')[0],
-        }
-      ]);
-      setEditingRoster(null);
-      fetchData();
+      const totalHours = calculateTotalHours(formData.start_time, formData.end_time);
+      const selectedClient = clients.find(c => c.id === formData.client_id);
+      const selectedProject = projects.find(p => p.id === formData.project_id);
+      
+      const defaultName = selectedClient && selectedProject 
+        ? `${selectedClient.company} - ${selectedProject.name} (${new Date(formData.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})`
+        : "";
+      const finalName = formData.name.trim() || defaultName || generateDefaultRosterName();
+      
+      // Create roster with first profile as primary
+      const { data: roster, error: rosterError } = await supabase
+        .from('rosters')
+        .insert({
+          profile_id: formData.profile_ids[0], // Use first selected profile as primary
+          client_id: formData.client_id,
+          project_id: formData.project_id,
+          date: formData.date,
+          end_date: formData.end_date || null,
+          start_time: formData.start_time,
+          end_time: formData.end_time,
+          total_hours: totalHours,
+          notes: formData.notes,
+          status: formData.status as 'pending' | 'confirmed' | 'cancelled',
+          name: finalName,
+          expected_profiles: formData.expected_profiles,
+          per_hour_rate: formData.per_hour_rate
+        })
+        .select()
+        .single();
+
+      if (rosterError) throw rosterError;
+
+      // Create roster_profiles entries for all selected profiles
+      const rosterProfilesData = formData.profile_ids.map(profileId => ({
+        roster_id: roster.id,
+        profile_id: profileId
+      }));
+
+      const { error: profilesError } = await supabase
+        .from('roster_profiles')
+        .insert(rosterProfilesData);
+
+      if (profilesError) throw profilesError;
+
+      toast({ title: "Success", description: "Roster created successfully" });
+      
+      setIsDialogOpen(false);
+      setFormData({
+        profile_ids: [],
+        client_id: "",
+        project_id: "",
+        date: "",
+        end_date: "",
+        start_time: "",
+        end_time: "",
+        notes: "",
+        status: "pending",
+        name: generateDefaultRosterName(),
+        expected_profiles: 1,
+        per_hour_rate: 0
+      });
+      fetchRosters();
     } catch (error) {
       console.error('Error saving roster:', error);
       toast({
@@ -279,270 +257,459 @@ const RosterManagement = () => {
     }
   };
 
-  // Filter rosters by week if filter is set
-  const filteredRosters = weekFilter.start && weekFilter.end 
-    ? rosters.filter(roster => {
-        const rosterDate = new Date(roster.date);
-        const startDate = new Date(weekFilter.start);
-        const endDate = new Date(weekFilter.end);
-        return rosterDate >= startDate && rosterDate <= endDate;
-      })
-    : rosters;
+  const updateStatus = async (id: string, status: 'confirmed' | 'cancelled') => {
+    try {
+      const { error } = await supabase
+        .from('rosters')
+        .update({ status })
+        .eq('id', id);
+
+      if (error) throw error;
+      toast({ 
+        title: "Success", 
+        description: `Roster ${status} successfully` 
+      });
+      fetchRosters();
+    } catch (error) {
+      console.error('Error updating status:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update status",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const deleteRoster = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this roster? This will also delete all associated working hours.')) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('rosters')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      toast({ 
+        title: "Success", 
+        description: "Roster deleted successfully" 
+      });
+      fetchRosters();
+    } catch (error) {
+      console.error('Error deleting roster:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete roster",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleEditRoster = (roster: RosterType) => {
+    setEditingRoster(roster);
+    setIsEditDialogOpen(true);
+  };
+
+  const handleViewRoster = (roster: RosterType) => {
+    setViewingRoster(roster);
+    setIsViewDialogOpen(true);
+  };
+
+  const handleEditSave = () => {
+    fetchRosters();
+    setEditingRoster(null);
+  };
+
+  // Filter rosters based on search term
+  const filteredRosters = rosters.filter(roster =>
+    (roster.roster_profiles?.some(rp => 
+      rp.profiles?.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
+    ) || false) ||
+    (roster.projects?.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (roster.name || '').toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // Filter rosters for current week (for list view)
+  const getWeekFilteredRosters = () => {
+    const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 });
+    const weekEnd = endOfWeek(currentWeek, { weekStartsOn: 1 });
+    
+    return filteredRosters.filter(roster => {
+      const rosterStartDate = parseISO(roster.date);
+      const rosterEndDate = roster.end_date ? parseISO(roster.end_date) : rosterStartDate;
+      
+      return isWithinInterval(rosterStartDate, { start: weekStart, end: weekEnd }) ||
+             isWithinInterval(rosterEndDate, { start: weekStart, end: weekEnd }) ||
+             (rosterStartDate <= weekStart && rosterEndDate >= weekEnd);
+    });
+  };
+
+  const weekFilteredRosters = getWeekFilteredRosters();
+
+  // Updated calendar view helper function
+  const getCalendarRosters = () => {
+    return filteredRosters;
+  };
+
+  const calendarRosters = getCalendarRosters();
+
+  if (loading && rosters.length === 0) {
+    return <div className="flex justify-center items-center h-64">Loading...</div>;
+  }
 
   return (
-    <div className="container mx-auto py-8">
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Calendar className="h-8 w-8 text-blue-600" />
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Enhanced Roster Management</h1>
+            <p className="text-gray-600">Schedule and manage team assignments with advanced features</p>
+          </div>
+        </div>
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogTrigger asChild>
+            <Button className="flex items-center gap-2">
+              <Plus className="h-4 w-4" />
+              Create Roster
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Create Enhanced Roster</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <Label htmlFor="name">Roster Name</Label>
+                <Input
+                  id="name"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="Auto-generated if left empty"
+                />
+                <p className="text-sm text-gray-500 mt-1">
+                  Default: {generateDefaultRosterName()}
+                </p>
+              </div>
+
+              <MultipleProfileSelector
+                profiles={profiles}
+                selectedProfileIds={formData.profile_ids}
+                onProfileSelect={(profileIds) => setFormData({ ...formData, profile_ids: profileIds })}
+                label="Select Team Members"
+                placeholder="Choose team members"
+                showRoleFilter={true}
+                className="border rounded-lg p-3 bg-gray-50"
+              />
+              
+              <div>
+                <Label htmlFor="client_id">Client</Label>
+                <Select value={formData.client_id} onValueChange={(value) => setFormData({ ...formData, client_id: value })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select client" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {clients.map((client) => (
+                      <SelectItem key={client.id} value={client.id}>
+                        {client.company}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="project_id">Project</Label>
+                <Select value={formData.project_id} onValueChange={(value) => setFormData({ ...formData, project_id: value })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select project" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {projects.filter(p => !formData.client_id || p.client_id === formData.client_id).map((project) => (
+                      <SelectItem key={project.id} value={project.id}>
+                        {project.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="date">Start Date</Label>
+                  <Input
+                    id="date"
+                    type="date"
+                    value={formData.date}
+                    onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="end_date">End Date (Optional)</Label>
+                  <Input
+                    id="end_date"
+                    type="date"
+                    value={formData.end_date}
+                    onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
+                    min={formData.date}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="start_time">Start Time</Label>
+                  <Input
+                    id="start_time"
+                    type="time"
+                    value={formData.start_time}
+                    onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="end_time">End Time</Label>
+                  <Input
+                    id="end_time"
+                    type="time"
+                    value={formData.end_time}
+                    onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="expected_profiles">Expected Team Members</Label>
+                  <Input
+                    id="expected_profiles"
+                    type="number"
+                    min="1"
+                    value={formData.expected_profiles}
+                    onChange={(e) => setFormData({ ...formData, expected_profiles: parseInt(e.target.value) || 1 })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="per_hour_rate">Hourly Rate (Optional)</Label>
+                  <Input
+                    id="per_hour_rate"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.per_hour_rate}
+                    onChange={(e) => setFormData({ ...formData, per_hour_rate: parseFloat(e.target.value) || 0 })}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="notes">Notes</Label>
+                <Textarea
+                  id="notes"
+                  value={formData.notes}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  placeholder="Additional notes for this roster..."
+                />
+              </div>
+
+              <Button type="submit" disabled={loading} className="w-full">
+                {loading ? "Creating..." : "Create Roster"}
+              </Button>
+            </form>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      {/* Enhanced Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-gray-600">Total Rosters</CardTitle>
+            <Calendar className="h-4 w-4 text-blue-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">{filteredRosters.length}</div>
+            <p className="text-xs text-muted-foreground">All scheduled rosters</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-gray-600">Confirmed</CardTitle>
+            <Users className="h-4 w-4 text-green-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">
+              {filteredRosters.filter(r => r.status === 'confirmed').length}
+            </div>
+            <p className="text-xs text-muted-foreground">Ready to work</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-gray-600">Total Hours</CardTitle>
+            <Clock className="h-4 w-4 text-purple-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-purple-600">
+              {filteredRosters.reduce((sum, r) => sum + r.total_hours, 0).toFixed(1)}
+            </div>
+            <p className="text-xs text-muted-foreground">Scheduled hours</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-gray-600">Expected Value</CardTitle>
+            <DollarSign className="h-4 w-4 text-orange-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-orange-600">
+              ${filteredRosters.reduce((sum, r) => sum + (r.total_hours * (r.per_hour_rate || 0)), 0).toFixed(2)}
+            </div>
+            <p className="text-xs text-muted-foreground">Estimated revenue</p>
+          </CardContent>
+        </Card>
+      </div>
+
       <Card>
         <CardHeader>
-          <CardTitle className="text-2xl">Roster Management</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle>Roster Views</CardTitle>
+            <div className="relative w-64">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Input
+                placeholder="Search by name or project..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
-          <div className="mb-4 flex items-center justify-between">
-            <Button onClick={() => setIsCalendarView(!isCalendarView)}>
-              {isCalendarView ? 'Show Form View' : 'Show Calendar View'}
-            </Button>
-            {!isCalendarView && (
-              <RosterWeeklyFilter onWeekChange={handleWeekChange} />
-            )}
-          </div>
-
-          {isCalendarView ? (
-            <EnhancedRosterCalendarView rosters={rosters} />
-          ) : (
-            <>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                {formData.map((data, index) => (
-                  <div key={index} className="border p-4 rounded-md">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor={`profile_id-${index}`}>Profile</Label>
-                        <Select
-                          value={data.profile_id}
-                          onValueChange={(value) => handleSelectChange(index, 'profile_id', value)}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select profile" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {profiles.map(profile => (
-                              <SelectItem key={profile.id} value={profile.id}>{profile.full_name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <Label htmlFor={`client_id-${index}`}>Client</Label>
-                        <Select
-                          value={data.client_id}
-                          onValueChange={(value) => handleSelectChange(index, 'client_id', value)}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select client" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {clients.map(client => (
-                              <SelectItem key={client.id} value={client.id}>{client.company}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <Label htmlFor={`project_id-${index}`}>Project</Label>
-                        <Select
-                          value={data.project_id}
-                          onValueChange={(value) => handleSelectChange(index, 'project_id', value)}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select project" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {projects.map(project => (
-                              <SelectItem key={project.id} value={project.id}>{project.name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <Label htmlFor={`status-${index}`}>Status</Label>
-                        <Select
-                          value={data.status}
-                          onValueChange={(value) => handleSelectChange(index, 'status', value)}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select status" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="pending">Pending</SelectItem>
-                            <SelectItem value="confirmed">Confirmed</SelectItem>
-                            <SelectItem value="cancelled">Cancelled</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <Label htmlFor={`date-${index}`}>Date</Label>
-                        <Input
-                          type="date"
-                          name="date"
-                          value={data.date}
-                          onChange={(e) => handleInputChange(index, e)}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor={`end_date-${index}`}>End Date</Label>
-                        <Input
-                          type="date"
-                          name="end_date"
-                          value={data.end_date}
-                          onChange={(e) => handleInputChange(index, e)}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor={`start_time-${index}`}>Start Time</Label>
-                        <Input
-                          type="time"
-                          name="start_time"
-                          value={data.start_time}
-                          onChange={(e) => handleDateTimeChange(index, 'start_time', e.target.value)}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor={`end_time-${index}`}>End Time</Label>
-                        <Input
-                          type="time"
-                          name="end_time"
-                          value={data.end_time}
-                          onChange={(e) => handleDateTimeChange(index, 'end_time', e.target.value)}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor={`total_hours-${index}`}>Total Hours</Label>
-                        <Input
-                          type="number"
-                          name="total_hours"
-                          value={data.total_hours}
-                          readOnly
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor={`expected_profiles-${index}`}>Expected Profiles</Label>
-                        <Input
-                          type="number"
-                          name="expected_profiles"
-                          value={data.expected_profiles}
-                          onChange={(e) => handleInputChange(index, e)}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor={`per_hour_rate-${index}`}>Per Hour Rate</Label>
-                        <Input
-                          type="number"
-                          name="per_hour_rate"
-                          value={data.per_hour_rate}
-                          onChange={(e) => handleInputChange(index, e)}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor={`name-${index}`}>Name</Label>
-                        <Input
-                          type="text"
-                          name="name"
-                          value={data.name}
-                          onChange={(e) => handleInputChange(index, e)}
-                        />
-                      </div>
-                    </div>
-                    <Label htmlFor={`notes-${index}`}>Notes</Label>
-                    <Textarea
-                      name="notes"
-                      value={data.notes}
-                      onChange={(e) => handleInputChange(index, e)}
-                    />
-                    <div className="flex justify-end mt-2">
-                      <Button type="button" variant="destructive" size="sm" onClick={() => handleRemoveRoster(index)}>
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Remove
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-
-                <Button type="button" variant="secondary" onClick={handleAddRoster} className="flex items-center gap-2">
-                  <Plus className="h-4 w-4" />
-                  Add Roster
-                </Button>
-
-                <Button type="submit" disabled={loading} className="w-full">
-                  {loading ? "Saving..." : editingRoster ? "Update Roster" : "Create Roster(s)"}
-                </Button>
-              </form>
-
-              {filteredRosters.length > 0 && (
-                <div className="mt-6">
-                  <h3 className="text-xl font-semibold mb-2">
-                    {weekFilter.start ? 'Filtered Rosters' : 'Existing Rosters'} ({filteredRosters.length})
-                  </h3>
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Profile
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Client
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Project
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Date
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Status
-                          </th>
-                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Actions
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {filteredRosters.map((roster) => (
-                          <tr key={roster.id}>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              {roster.profiles?.full_name}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              {roster.clients?.company}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              {roster.projects?.name}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              {new Date(roster.date).toLocaleDateString()}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              {roster.status}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-right">
-                              <RosterActions
-                                roster={roster}
-                                onEdit={handleEditRoster}
-                                onDelete={handleDeleteRoster}
-                                onView={handleViewRoster}
-                              />
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="calendar">Calendar View</TabsTrigger>
+              <TabsTrigger value="list">List View</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="calendar" className="mt-6">
+              <EnhancedRosterCalendarView 
+                rosters={calendarRosters} 
+                onEdit={handleEditRoster}
+                onDelete={deleteRoster}
+                onView={handleViewRoster}
+              />
+            </TabsContent>
+            
+            <TabsContent value="list" className="mt-4">
+              <RosterWeeklyFilter 
+                currentWeek={currentWeek}
+                onWeekChange={setCurrentWeek}
+              />
+              
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-gray-200">
+                      <th className="text-left py-3 px-4 font-medium text-gray-600">Roster Name</th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-600">Team Members</th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-600">Project</th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-600">Date Range</th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-600">Time</th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-600">Status</th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-600">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {weekFilteredRosters.map((roster) => (
+                      <tr key={roster.id} className="border-b border-gray-100 hover:bg-gray-50">
+                        <td className="py-3 px-4">
+                          <div className="font-medium text-gray-900">{roster.name || 'Unnamed Roster'}</div>
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="flex flex-wrap gap-1">
+                            {roster.roster_profiles?.map((rp) => (
+                              <Badge key={rp.id} variant="secondary" className="text-xs">
+                                {rp.profiles?.full_name}
+                              </Badge>
+                            )) || <span className="text-gray-500">No profiles assigned</span>}
+                          </div>
+                        </td>
+                        <td className="py-3 px-4">
+                          <div>
+                            <div className="font-medium text-gray-900">{roster.projects?.name || 'N/A'}</div>
+                            <div className="text-sm text-gray-600">{roster.clients?.company || 'N/A'}</div>
+                          </div>
+                        </td>
+                        <td className="py-3 px-4 text-gray-600">
+                          <div className="text-sm">
+                            {new Date(roster.date).toLocaleDateString()}
+                            {roster.end_date && roster.end_date !== roster.date && (
+                              <div className="text-xs text-gray-500">
+                                to {new Date(roster.end_date).toLocaleDateString()}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-3 px-4 text-gray-600">
+                          <div className="text-sm">
+                            {roster.start_time} - {roster.end_time}
+                          </div>
+                        </td>
+                        <td className="py-3 px-4">
+                          <Badge variant={
+                            roster.status === "confirmed" ? "default" : 
+                            roster.status === "pending" ? "secondary" : "outline"
+                          }>
+                            {roster.status}
+                          </Badge>
+                        </td>
+                        <td className="py-3 px-4">
+                          <RosterActions
+                            roster={roster}
+                            onEdit={handleEditRoster}
+                            onDelete={deleteRoster}
+                            onView={handleViewRoster}
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
+      
+      <RosterEditDialog
+        roster={editingRoster}
+        isOpen={isEditDialogOpen}
+        onClose={() => {
+          setIsEditDialogOpen(false);
+          setEditingRoster(null);
+        }}
+        onSave={handleEditSave}
+        profiles={profiles}
+        clients={clients}
+        projects={projects}
+      />
+
+      <RosterViewDialog
+        roster={viewingRoster}
+        isOpen={isViewDialogOpen}
+        onClose={() => {
+          setIsViewDialogOpen(false);
+          setViewingRoster(null);
+        }}
+      />
     </div>
   );
 };
-
-export default RosterManagement;

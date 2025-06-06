@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Calculator, DollarSign, AlertTriangle, RefreshCw, ChevronDown, ChevronUp } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { Profile, WorkingHour, Payroll } from "@/types/database";
 import { useToast } from "@/hooks/use-toast";
@@ -32,6 +33,7 @@ export const PayrollGenerationWizard = ({ profiles, workingHours, onRefresh }: P
   const [filteredWorkingHours, setFilteredWorkingHours] = useState<WorkingHour[]>([]);
   const [overlappingPayrolls, setOverlappingPayrolls] = useState<string[]>([]);
   const [isWorkingHoursOpen, setIsWorkingHoursOpen] = useState(false);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -90,38 +92,15 @@ export const PayrollGenerationWizard = ({ profiles, workingHours, onRefresh }: P
       const profileIdsFromWorkingHours = new Set(typedWorkingHours.map(wh => wh.profile_id));
       console.log('Profile IDs from working hours:', profileIdsFromWorkingHours.size);
 
-      // Filter profiles that have working hours and unpaid hours
+      // Filter profiles that have approved working hours in the date range
       let eligibleProfiles = profiles.filter(profile => {
-        if (!profileIdsFromWorkingHours.has(profile.id)) {
-          return false;
-        }
-
-        const profileHours = typedWorkingHours.filter(wh => 
-          wh.profile_id === profile.id
-        );
-
-        if (profileHours.length === 0) {
-          return false;
-        }
-
-        // Check if any of these hours are NOT already paid (exist in a paid payroll)
-        const hasUnpaidHours = profileHours.some(wh => {
-          const isPaid = existingPayrolls.some(payroll => 
-            payroll.profile_id === profile.id &&
-            payroll.status === 'paid' &&
-            wh.date >= payroll.pay_period_start &&
-            wh.date <= payroll.pay_period_end
-          );
-          return !isPaid;
-        });
-
-        return hasUnpaidHours;
+        return profileIdsFromWorkingHours.has(profile.id);
       });
 
-      console.log('Profiles with unpaid hours:', eligibleProfiles.length);
+      console.log('Profiles with approved working hours:', eligibleProfiles.length);
       setFilteredProfiles(eligibleProfiles);
 
-      // Clear selected profiles if they're no longer eligible
+      // Maintain selected profiles if they're still eligible
       setSelectedProfileIds(prev => 
         prev.filter(id => eligibleProfiles.some(p => p.id === id))
       );
@@ -181,28 +160,17 @@ export const PayrollGenerationWizard = ({ profiles, workingHours, onRefresh }: P
         const profile = filteredProfiles.find(p => p.id === profileId);
         if (!profile) continue;
 
-        // Get working hours for this profile in date range, excluding already paid ones
+        // Get working hours for this profile in date range
         const profileHours = filteredWorkingHours.filter(wh => 
           wh.profile_id === profileId
         );
 
-        // Filter out hours that are already covered by paid payrolls
-        const unpaidHours = profileHours.filter(wh => {
-          const isPaid = existingPayrolls.some(payroll => 
-            payroll.profile_id === profileId &&
-            payroll.status === 'paid' &&
-            wh.date >= payroll.pay_period_start &&
-            wh.date <= payroll.pay_period_end
-          );
-          return !isPaid;
-        });
-
-        const totalHours = unpaidHours.reduce((sum, wh) => sum + wh.total_hours, 0);
-        const overtimeHours = unpaidHours.reduce((sum, wh) => sum + (wh.overtime_hours || 0), 0);
+        const totalHours = profileHours.reduce((sum, wh) => sum + wh.total_hours, 0);
+        const overtimeHours = profileHours.reduce((sum, wh) => sum + (wh.overtime_hours || 0), 0);
         const regularHours = totalHours - overtimeHours;
         
         // Calculate average hourly rate from working hours
-        const totalPayableAmount = unpaidHours.reduce((sum, wh) => sum + (wh.hourly_rate || 0) * wh.total_hours, 0);
+        const totalPayableAmount = profileHours.reduce((sum, wh) => sum + (wh.hourly_rate || 0) * wh.total_hours, 0);
         const averageRate = totalHours > 0 ? totalPayableAmount / totalHours : 0;
         
         const regularPay = regularHours * averageRate;
@@ -224,7 +192,7 @@ export const PayrollGenerationWizard = ({ profiles, workingHours, onRefresh }: P
             grossPay,
             deductions,
             netPay,
-            workingHours: unpaidHours
+            workingHours: profileHours
           });
         }
       }
@@ -237,16 +205,20 @@ export const PayrollGenerationWizard = ({ profiles, workingHours, onRefresh }: P
     }
   };
 
-  const generatePayroll = async () => {
+  const handleNextStep = () => {
     if (overlappingPayrolls.length > 0) {
-      toast({
-        title: "Cannot Generate Payroll",
-        description: "Some profiles have overlapping payroll periods. Please resolve conflicts first.",
-        variant: "destructive"
-      });
-      return;
+      setShowConfirmDialog(true);
+    } else {
+      setStep(2);
     }
+  };
 
+  const confirmProceedWithOverlaps = () => {
+    setShowConfirmDialog(false);
+    setStep(2);
+  };
+
+  const generatePayroll = async () => {
     try {
       setLoading(true);
       const payrollRecords = [];
@@ -342,7 +314,7 @@ export const PayrollGenerationWizard = ({ profiles, workingHours, onRefresh }: P
                     <div className="mb-4">
                       <div className="flex items-center gap-2 text-sm text-blue-600 mb-2">
                         <Calculator className="h-4 w-4" />
-                        Showing employees with unpaid approved working hours for selected period
+                        Showing employees with approved working hours for selected period
                         {filterLoading && <RefreshCw className="h-4 w-4 animate-spin" />}
                       </div>
                     </div>
@@ -439,17 +411,54 @@ export const PayrollGenerationWizard = ({ profiles, workingHours, onRefresh }: P
                         return <li key={profileId}>• {profile?.full_name}</li>;
                       })}
                     </ul>
+                    <p className="text-sm text-orange-700 mt-2 font-medium">
+                      You can still proceed, but this may create duplicate payroll records.
+                    </p>
                   </div>
                 )}
               </div>
 
               <div className="flex justify-end">
-                <Button 
-                  onClick={() => setStep(2)} 
-                  disabled={selectedProfileIds.length === 0 || !dateRange.start || !dateRange.end || payrollPreview.length === 0 || overlappingPayrolls.length > 0}
-                >
-                  Next: Review Payroll ({payrollPreview.length} employees)
-                </Button>
+                <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+                  <AlertDialogTrigger asChild>
+                    <Button 
+                      onClick={handleNextStep}
+                      disabled={selectedProfileIds.length === 0 || !dateRange.start || !dateRange.end || payrollPreview.length === 0}
+                    >
+                      Next: Review Payroll ({payrollPreview.length} employees)
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle className="flex items-center gap-2">
+                        <AlertTriangle className="h-5 w-5 text-orange-500" />
+                        Existing Payroll Records Found
+                      </AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Some selected employees already have payroll records for overlapping periods:
+                        <ul className="mt-2 space-y-1">
+                          {overlappingPayrolls.map(profileId => {
+                            const profile = filteredProfiles.find(p => p.id === profileId);
+                            return (
+                              <li key={profileId} className="text-sm font-medium">
+                                • {profile?.full_name}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                        <p className="mt-3 font-medium">
+                          Do you want to proceed? This may create duplicate payroll records for the overlapping periods.
+                        </p>
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={confirmProceedWithOverlaps}>
+                        Proceed Anyway
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </div>
             </div>
           )}
@@ -498,8 +507,7 @@ export const PayrollGenerationWizard = ({ profiles, workingHours, onRefresh }: P
 
               {payrollPreview.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
-                  <p>No unpaid working hours found for the selected period and profiles.</p>
-                  <p className="text-sm">Please ensure working hours are approved and not already paid.</p>
+                  <p>No approved working hours found for the selected period and profiles.</p>
                 </div>
               ) : (
                 <>

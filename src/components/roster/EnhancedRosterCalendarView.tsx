@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,12 +7,16 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { CalendarDays, Clock, Users, DollarSign, ChevronLeft, ChevronRight } from "lucide-react";
 import { Roster as RosterType } from "@/types/database";
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, isWithinInterval, parseISO } from "date-fns";
+import { RosterActions } from "./RosterActions";
 
 interface EnhancedRosterCalendarViewProps {
   rosters: RosterType[];
+  onEdit: (roster: RosterType) => void;
+  onDelete: (id: string) => void;
+  onView: (roster: RosterType) => void;
 }
 
-export const EnhancedRosterCalendarView = ({ rosters }: EnhancedRosterCalendarViewProps) => {
+export const EnhancedRosterCalendarView = ({ rosters, onEdit, onDelete, onView }: EnhancedRosterCalendarViewProps) => {
   const [currentWeek, setCurrentWeek] = useState(new Date());
 
   const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 }); // Monday
@@ -116,12 +119,20 @@ export const EnhancedRosterCalendarView = ({ rosters }: EnhancedRosterCalendarVi
                           </Badge>
                         </div>
                       </div>
-                      <Badge variant={
-                        roster.status === "confirmed" ? "default" : 
-                        roster.status === "pending" ? "secondary" : "outline"
-                      } className="ml-2 shrink-0">
-                        {roster.status}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Badge variant={
+                          roster.status === "confirmed" ? "default" : 
+                          roster.status === "pending" ? "secondary" : "outline"
+                        } className="ml-2 shrink-0">
+                          {roster.status}
+                        </Badge>
+                        <RosterActions
+                          roster={roster}
+                          onEdit={onEdit}
+                          onDelete={onDelete}
+                          onView={onView}
+                        />
+                      </div>
                     </div>
 
                     {/* Project & Client */}

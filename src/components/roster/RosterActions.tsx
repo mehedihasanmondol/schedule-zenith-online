@@ -1,46 +1,38 @@
 
 import { ActionDropdown } from "@/components/ui/action-dropdown";
 import { Edit, Trash2, Eye } from "lucide-react";
-
-interface Roster {
-  id: string;
-  status: string;
-}
+import { Roster as RosterType } from "@/types/database";
 
 interface RosterActionsProps {
-  roster: Roster;
-  onEdit: (id: string) => void;
+  roster: RosterType;
+  onEdit: (roster: RosterType) => void;
   onDelete: (id: string) => void;
-  onView: (id: string) => void;
+  onView: (roster: RosterType) => void;
 }
 
-export const RosterActions = ({
-  roster,
-  onEdit,
-  onDelete,
-  onView
-}: RosterActionsProps) => {
+export const RosterActions = ({ roster, onEdit, onDelete, onView }: RosterActionsProps) => {
+  const canEditDelete = roster.status !== 'cancelled';
+
   const items = [
     {
       label: "View Details",
-      onClick: () => onView(roster.id),
+      onClick: () => onView(roster),
       icon: <Eye className="h-4 w-4" />
     }
   ];
 
-  // Add edit and delete options if not locked or paid
-  if (roster.status !== 'paid') {
+  if (canEditDelete) {
     items.unshift(
       {
         label: "Edit",
-        onClick: () => onEdit(roster.id),
+        onClick: () => onEdit(roster),
         icon: <Edit className="h-4 w-4" />
       },
       {
         label: "Delete",
         onClick: () => onDelete(roster.id),
         icon: <Trash2 className="h-4 w-4" />,
-        variant: "destructive" as const
+        destructive: true
       }
     );
   }

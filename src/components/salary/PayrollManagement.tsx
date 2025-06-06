@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,7 +10,6 @@ import { Plus, Search, Calculator } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Payroll, Profile, WorkingHour, Client, Project, BankAccount } from "@/types/database";
 import { useToast } from "@/hooks/use-toast";
-import { PayrollActions } from "@/components/payroll/PayrollActions";
 
 interface PayrollManagementProps {
   payrolls: Payroll[];

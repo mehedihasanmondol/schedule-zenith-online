@@ -1,22 +1,32 @@
-import React, { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Clock, Calendar, DollarSign, Plus, Edit, Trash2, CheckCircle, XCircle, Eye, Search, Timer } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import type { WorkingHour, Profile, Client, Project } from '@/types/database';
-import { EditWorkingHoursDialog } from './EditWorkingHoursDialog';
-import { WorkingHoursActions } from './working-hours/WorkingHoursActions';
-import { ProfileSelector } from './common/ProfileSelector';
+import { useState, useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Plus, Clock, CheckCircle, XCircle, DollarSign, Timer } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { WorkingHour, Profile, Client, Project } from "@/types/database";
+import { useToast } from "@/hooks/use-toast";
+import { ProfileSelector } from "@/components/common/ProfileSelector";
+import { EditWorkingHoursDialog } from "@/components/EditWorkingHoursDialog";
+import { WorkingHoursFilter } from "@/components/working-hours/WorkingHoursFilter";
+import { WorkingHoursActions } from "@/components/working-hours/WorkingHoursActions";
+import { WorkingHoursViewDialog } from "@/components/working-hours/WorkingHoursViewDialog";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-const WorkingHours = () => {
+export const WorkingHoursComponent = () => {
   const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [profileFilter, setProfileFilter] = useState("all");
+  const [clientFilter, setClientFilter] = useState("all");
+  const [projectFilter, setProjectFilter] = useState("all");
+  const [dateShortcut, setDateShortcut] = useState("current-week");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  
   const [workingHours, setWorkingHours] = useState<WorkingHour[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
@@ -25,6 +35,8 @@ const WorkingHours = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingWorkingHour, setEditingWorkingHour] = useState<WorkingHour | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [viewingWorkingHour, setViewingWorkingHour] = useState<WorkingHour | null>(null);
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const { toast } = useToast();
 
   const [formData, setFormData] = useState({
@@ -38,8 +50,22 @@ const WorkingHours = () => {
     sign_out_time: "",
     hourly_rate: 0,
     notes: "",
-    status: "pending" as const
+    status: "pending" as "pending" | "approved" | "rejected" | "paid"
   });
+
+  // Set default dates to current week
+  useEffect(() => {
+    const today = new Date();
+    const currentDay = today.getDay();
+    const mondayDate = new Date(today);
+    mondayDate.setDate(today.getDate() - (currentDay === 0 ? 6 : currentDay - 1));
+    
+    const sundayDate = new Date(mondayDate);
+    sundayDate.setDate(mondayDate.getDate() + 6);
+    
+    setStartDate(mondayDate.toISOString().split('T')[0]);
+    setEndDate(sundayDate.toISOString().split('T')[0]);
+  }, []);
 
   useEffect(() => {
     fetchWorkingHours();
@@ -48,6 +74,7 @@ const WorkingHours = () => {
     fetchProjects();
   }, []);
 
+  // Auto-fill today's date when dialog opens
   useEffect(() => {
     if (isDialogOpen && !editingWorkingHour) {
       setFormData(prev => ({
@@ -162,19 +189,17 @@ const WorkingHours = () => {
       const overtimeHours = Math.max(0, actualHours - totalHours);
       const payableAmount = (actualHours || totalHours) * formData.hourly_rate;
       
-      const workingHourData = {
-        ...formData,
-        total_hours: totalHours,
-        actual_hours: actualHours || null,
-        overtime_hours: overtimeHours,
-        payable_amount: payableAmount,
-        sign_in_time: formData.sign_in_time || null,
-        sign_out_time: formData.sign_out_time || null
-      };
-
       const { error } = await supabase
         .from('working_hours')
-        .insert([workingHourData]);
+        .insert({
+          ...formData,
+          total_hours: totalHours,
+          actual_hours: actualHours || null,
+          overtime_hours: overtimeHours,
+          payable_amount: payableAmount,
+          sign_in_time: formData.sign_in_time || null,
+          sign_out_time: formData.sign_out_time || null
+        });
 
       if (error) throw error;
       toast({ title: "Success", description: "Working hours logged successfully" });
@@ -240,13 +265,13 @@ const WorkingHours = () => {
   const handleView = (id: string) => {
     const workingHour = workingHours.find(wh => wh.id === id);
     if (workingHour) {
-      setEditingWorkingHour(workingHour);
-      setIsEditDialogOpen(true);
+      setViewingWorkingHour(workingHour);
+      setIsViewDialogOpen(true);
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (window.confirm("Are you sure you want to delete this working hour record?")) {
+    if (window.confirm('Are you sure you want to delete this working hour entry?')) {
       try {
         const { error } = await supabase
           .from('working_hours')
@@ -254,23 +279,39 @@ const WorkingHours = () => {
           .eq('id', id);
 
         if (error) throw error;
-        toast({ title: "Success", description: "Working hour record deleted successfully" });
+        toast({ title: "Success", description: "Working hours deleted successfully" });
         fetchWorkingHours();
       } catch (error) {
-        console.error('Error deleting working hour:', error);
+        console.error('Error deleting working hours:', error);
         toast({
           title: "Error",
-          description: "Failed to delete working hour record",
+          description: "Failed to delete working hours",
           variant: "destructive"
         });
       }
     }
   };
 
-  const filteredWorkingHours = workingHours.filter(wh =>
-    (wh.profiles?.full_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (wh.projects?.name || '').toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredWorkingHours = workingHours.filter(wh => {
+    const matchesSearch = (wh.profiles?.full_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (wh.projects?.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (wh.clients?.company || '').toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesStatus = statusFilter === "all" || wh.status === statusFilter;
+    const matchesProfile = profileFilter === "all" || wh.profile_id === profileFilter;
+    const matchesClient = clientFilter === "all" || wh.client_id === clientFilter;
+    const matchesProject = projectFilter === "all" || wh.project_id === projectFilter;
+    
+    let matchesDate = true;
+    if (startDate && endDate) {
+      const whDate = new Date(wh.date);
+      const filterStart = new Date(startDate);
+      const filterEnd = new Date(endDate);
+      matchesDate = whDate >= filterStart && whDate <= filterEnd;
+    }
+    
+    return matchesSearch && matchesStatus && matchesProfile && matchesClient && matchesProject && matchesDate;
+  });
 
   if (loading && workingHours.length === 0) {
     return <div className="flex justify-center items-center h-64">Loading...</div>;
@@ -495,20 +536,32 @@ const WorkingHours = () => {
         </Card>
       </div>
 
+      {/* Filters */}
+      <WorkingHoursFilter
+        searchTerm={searchTerm}
+        setSearchTerm={setSearchTerm}
+        statusFilter={statusFilter}
+        setStatusFilter={setStatusFilter}
+        profileFilter={profileFilter}
+        setProfileFilter={setProfileFilter}
+        clientFilter={clientFilter}
+        setClientFilter={setClientFilter}
+        projectFilter={projectFilter}
+        setProjectFilter={setProjectFilter}
+        startDate={startDate}
+        setStartDate={setStartDate}
+        endDate={endDate}
+        setEndDate={setEndDate}
+        dateShortcut={dateShortcut}
+        setDateShortcut={setDateShortcut}
+        profiles={profiles}
+        clients={clients}
+        projects={projects}
+      />
+
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>Enhanced Working Hours Log ({filteredWorkingHours.length})</CardTitle>
-            <div className="relative w-64">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-              <Input
-                placeholder="Search by name or project..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-          </div>
+          <CardTitle>Enhanced Working Hours Log ({filteredWorkingHours.length})</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -582,13 +635,34 @@ const WorkingHours = () => {
                       </Badge>
                     </td>
                     <td className="py-3 px-4">
-                      <WorkingHoursActions
-                        workingHour={wh}
-                        onApprove={(id) => updateStatus(id, "approved")}
-                        onEdit={handleEdit}
-                        onDelete={handleDelete}
-                        onView={handleView}
-                      />
+                      <div className="flex items-center gap-2">
+                        {wh.status === "pending" && (
+                          <>
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => updateStatus(wh.id, "approved")}
+                              className="text-green-600 hover:text-green-700"
+                            >
+                              <CheckCircle className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => updateStatus(wh.id, "rejected")}
+                              className="text-red-600 hover:text-red-700"
+                            >
+                              <XCircle className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
+                        <WorkingHoursActions
+                          workingHour={wh}
+                          onEdit={handleEdit}
+                          onDelete={handleDelete}
+                          onView={handleView}
+                        />
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -610,8 +684,15 @@ const WorkingHours = () => {
         clients={clients}
         projects={projects}
       />
+
+      <WorkingHoursViewDialog
+        workingHour={viewingWorkingHour}
+        isOpen={isViewDialogOpen}
+        onClose={() => {
+          setIsViewDialogOpen(false);
+          setViewingWorkingHour(null);
+        }}
+      />
     </div>
   );
 };
-
-export default WorkingHours;

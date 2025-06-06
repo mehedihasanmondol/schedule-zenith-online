@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,7 +7,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Search, Calendar, Plus } from "lucide-react";
 import type { Payroll as PayrollType } from "@/types/database";
-import { PayrollActions } from "./PayrollActions";
 
 interface PayrollListWithFiltersProps {
   payrolls: PayrollType[];
@@ -14,8 +14,6 @@ interface PayrollListWithFiltersProps {
   onMarkAsPaid: (payroll: PayrollType) => void;
   onApprove: (id: string) => void;
   onCreatePayroll: () => void;
-  onEdit: (id: string) => void;
-  onDelete: (id: string) => void;
   loading: boolean;
 }
 
@@ -25,8 +23,6 @@ export const PayrollListWithFilters = ({
   onMarkAsPaid, 
   onApprove,
   onCreatePayroll,
-  onEdit,
-  onDelete,
   loading 
 }: PayrollListWithFiltersProps) => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -104,21 +100,6 @@ export const PayrollListWithFilters = ({
     
     setStartDate(start.toISOString().split('T')[0]);
     setEndDate(end.toISOString().split('T')[0]);
-  };
-
-  const handleEdit = (id: string) => {
-    onEdit(id);
-  };
-
-  const handleDelete = (id: string) => {
-    onDelete(id);
-  };
-
-  const handleView = (id: string) => {
-    const payroll = payrolls.find(p => p.id === id);
-    if (payroll) {
-      onViewPayroll(payroll);
-    }
   };
 
   const filteredPayrolls = payrolls.filter(payroll => {
@@ -280,6 +261,13 @@ export const PayrollListWithFilters = ({
                     </td>
                     <td className="py-3 px-4">
                       <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => onViewPayroll(payroll)}
+                        >
+                          View Details
+                        </Button>
                         {payroll.status === 'pending' && (
                           <Button
                             variant="outline"
@@ -297,12 +285,6 @@ export const PayrollListWithFilters = ({
                             Mark as Paid
                           </Button>
                         )}
-                        <PayrollActions
-                          payroll={payroll}
-                          onEdit={handleEdit}
-                          onDelete={handleDelete}
-                          onView={handleView}
-                        />
                       </div>
                     </td>
                   </tr>

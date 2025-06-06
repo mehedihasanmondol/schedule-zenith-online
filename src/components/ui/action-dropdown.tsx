@@ -14,6 +14,7 @@ interface ActionDropdownItem {
   onClick: () => void;
   icon?: React.ReactNode;
   variant?: "default" | "destructive";
+  destructive?: boolean;
 }
 
 interface ActionDropdownProps {
@@ -34,7 +35,7 @@ export const ActionDropdown = ({ items }: ActionDropdownProps) => {
             key={index}
             onClick={item.onClick}
             className={`flex items-center gap-2 ${
-              item.variant === "destructive" ? "text-red-600 hover:text-red-700" : ""
+              item.variant === "destructive" || item.destructive ? "text-red-600 hover:text-red-700" : ""
             }`}
           >
             {item.icon}
