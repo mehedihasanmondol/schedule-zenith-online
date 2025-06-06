@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Search, Calendar, Plus } from "lucide-react";
+import { PayrollActions } from "./PayrollActions";
 import type { Payroll as PayrollType } from "@/types/database";
 
 interface PayrollListWithFiltersProps {
@@ -14,6 +14,8 @@ interface PayrollListWithFiltersProps {
   onMarkAsPaid: (payroll: PayrollType) => void;
   onApprove: (id: string) => void;
   onCreatePayroll: () => void;
+  onEditPayroll?: (payroll: PayrollType) => void;
+  onDeletePayroll?: (id: string) => void;
   loading: boolean;
 }
 
@@ -23,6 +25,8 @@ export const PayrollListWithFilters = ({
   onMarkAsPaid, 
   onApprove,
   onCreatePayroll,
+  onEditPayroll,
+  onDeletePayroll,
   loading 
 }: PayrollListWithFiltersProps) => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -100,6 +104,18 @@ export const PayrollListWithFilters = ({
     
     setStartDate(start.toISOString().split('T')[0]);
     setEndDate(end.toISOString().split('T')[0]);
+  };
+
+  const handleEditPayroll = (payroll: PayrollType) => {
+    if (onEditPayroll) {
+      onEditPayroll(payroll);
+    }
+  };
+
+  const handleDeletePayroll = (id: string) => {
+    if (onDeletePayroll) {
+      onDeletePayroll(id);
+    }
   };
 
   const filteredPayrolls = payrolls.filter(payroll => {
@@ -260,14 +276,7 @@ export const PayrollListWithFilters = ({
                       </Badge>
                     </td>
                     <td className="py-3 px-4">
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => onViewPayroll(payroll)}
-                        >
-                          View Details
-                        </Button>
+                      <div className="flex gap-2 items-center">
                         {payroll.status === 'pending' && (
                           <Button
                             variant="outline"
@@ -285,6 +294,12 @@ export const PayrollListWithFilters = ({
                             Mark as Paid
                           </Button>
                         )}
+                        <PayrollActions
+                          payroll={payroll}
+                          onEdit={handleEditPayroll}
+                          onDelete={handleDeletePayroll}
+                          onView={onViewPayroll}
+                        />
                       </div>
                     </td>
                   </tr>
