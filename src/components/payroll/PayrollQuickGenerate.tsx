@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -230,8 +231,14 @@ export const PayrollQuickGenerate = ({
     availableWorkingHours.some(wh => wh.profile_id === profile.id)
   );
 
-  const hasAvailableHours = previewWorkingHours.length > 0;
-  const allHoursLinked = previewWorkingHours.every(wh => wh.isLinkedToPayroll);
+  // Check if this preselected profile has available hours
+  const preSelectedProfileHasAvailableHours = preSelectedProfile ? 
+    availableWorkingHours.some(wh => wh.profile_id === preSelectedProfile.id) : false;
+
+  // Determine if button should be enabled
+  const shouldEnableButton = preSelectedProfile ? 
+    preSelectedProfileHasAvailableHours : 
+    profilesWithAvailableHours.length > 0;
 
   const formContent = (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -257,7 +264,7 @@ export const PayrollQuickGenerate = ({
             <div>
               <h3 className="font-medium text-blue-900">{preSelectedProfile.full_name}</h3>
               <p className="text-sm text-blue-700">{preSelectedProfile.role}</p>
-              {!hasAvailableHours && (
+              {!preSelectedProfileHasAvailableHours && (
                 <p className="text-xs text-orange-600 mt-1">No available working hours found</p>
               )}
             </div>
@@ -383,7 +390,7 @@ export const PayrollQuickGenerate = ({
         </Collapsible>
       )}
 
-      {preSelectedProfile && !hasAvailableHours && (
+      {preSelectedProfile && !preSelectedProfileHasAvailableHours && (
         <div className="p-3 bg-orange-50 border border-orange-200 rounded text-sm">
           <div className="flex items-center gap-1 text-orange-700 font-medium">
             <AlertTriangle className="h-4 w-4" />
@@ -397,7 +404,7 @@ export const PayrollQuickGenerate = ({
 
       <Button 
         type="submit" 
-        disabled={loading || formData.total_hours === 0 || !hasAvailableHours} 
+        disabled={loading || formData.total_hours === 0 || !shouldEnableButton} 
         className="w-full"
       >
         {loading ? "Creating..." : buttonText}
@@ -417,7 +424,7 @@ export const PayrollQuickGenerate = ({
         <Button 
           className="flex items-center gap-2" 
           variant={preSelectedProfile ? "default" : "outline"}
-          disabled={preSelectedProfile && !hasAvailableHours}
+          disabled={!shouldEnableButton}
         >
           {buttonIcon}
           {buttonText}
