@@ -36,6 +36,8 @@ export const PayrollQuickGenerate = ({
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isWorkingHoursPreviewOpen, setIsWorkingHoursPreviewOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [availableWorkingHours, setAvailableWorkingHours] = useState<WorkingHour[]>([]);
+  const [linkedWorkingHoursIds, setLinkedWorkingHoursIds] = useState<Set<string>>(new Set());
   const { toast } = useToast();
 
   const [formData, setFormData] = useState({
@@ -52,10 +54,37 @@ export const PayrollQuickGenerate = ({
 
   const [previewWorkingHours, setPreviewWorkingHours] = useState<WorkingHourWithLinkStatus[]>([]);
 
+  // Fetch linked working hours on component mount
+  useEffect(() => {
+    fetchLinkedWorkingHours();
+  }, []);
+
+  // Filter available working hours when linkedWorkingHoursIds changes
+  useEffect(() => {
+    const available = workingHours.filter(wh => !linkedWorkingHoursIds.has(wh.id));
+    setAvailableWorkingHours(available);
+  }, [workingHours, linkedWorkingHoursIds]);
+
+  const fetchLinkedWorkingHours = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('payroll_working_hours')
+        .select('working_hours_id');
+
+      if (error) throw error;
+
+      const linkedIds = new Set(data?.map(link => link.working_hours_id) || []);
+      setLinkedWorkingHoursIds(linkedIds);
+    } catch (error) {
+      console.error('Error fetching linked working hours:', error);
+    }
+  };
+
   // Auto-fill form when preSelectedProfile is provided
   useEffect(() => {
     if (preSelectedProfile && isDialogOpen) {
-      const profileWorkingHours = workingHours.filter(wh => wh.profile_id === preSelectedProfile.id);
+      // Use available working hours instead of all working hours
+      const profileWorkingHours = availableWorkingHours.filter(wh => wh.profile_id === preSelectedProfile.id);
       
       if (profileWorkingHours.length > 0) {
         // Get date range
@@ -85,7 +114,7 @@ export const PayrollQuickGenerate = ({
         setIsWorkingHoursPreviewOpen(true);
       }
     }
-  }, [preSelectedProfile, isDialogOpen, workingHours]);
+  }, [preSelectedProfile, isDialogOpen, availableWorkingHours]);
 
   const checkWorkingHoursLinkStatus = async (hoursToCheck: WorkingHour[]) => {
     try {
@@ -152,6 +181,9 @@ export const PayrollQuickGenerate = ({
         status: "pending"
       });
       setPreviewWorkingHours([]);
+      
+      // Refresh linked working hours after creating payroll
+      await fetchLinkedWorkingHours();
       onRefresh();
     } catch (error) {
       console.error('Error creating payroll:', error);
@@ -167,7 +199,8 @@ export const PayrollQuickGenerate = ({
 
   useEffect(() => {
     if (formData.profile_id && formData.pay_period_start && formData.pay_period_end && !preSelectedProfile) {
-      const profileWorkingHours = workingHours.filter(wh => 
+      // Use available working hours instead of all working hours
+      const profileWorkingHours = availableWorkingHours.filter(wh => 
         wh.profile_id === formData.profile_id &&
         wh.date >= formData.pay_period_start &&
         wh.date <= formData.pay_period_end
@@ -186,7 +219,7 @@ export const PayrollQuickGenerate = ({
       
       checkWorkingHoursLinkStatus(profileWorkingHours);
     }
-  }, [formData.profile_id, formData.pay_period_start, formData.pay_period_end, workingHours, preSelectedProfile]);
+  }, [formData.profile_id, formData.pay_period_start, formData.pay_period_end, availableWorkingHours, preSelectedProfile]);
 
   const buttonText = preSelectedProfile ? "Quick Generate" : "Create Payroll";
   const buttonIcon = preSelectedProfile ? <Zap className="h-4 w-4" /> : <Plus className="h-4 w-4" />;
@@ -194,14 +227,19 @@ export const PayrollQuickGenerate = ({
   const availableHours = previewWorkingHours.filter(wh => !wh.isLinkedToPayroll);
   const linkedHours = previewWorkingHours.filter(wh => wh.isLinkedToPayroll);
 
+  // Filter profiles that have available working hours
+  const profilesWithAvailableHours = profiles.filter(profile => 
+    availableWorkingHours.some(wh => wh.profile_id === profile.id)
+  );
+
   const formContent = (
     <form onSubmit={handleSubmit} className="space-y-4">
       {!preSelectedProfile && (
         <ProfileSelector
-          profiles={profiles}
+          profiles={profilesWithAvailableHours}
           selectedProfileId={formData.profile_id}
           onProfileSelect={(profileId) => setFormData({ ...formData, profile_id: profileId })}
-          label="Select Profile"
+          label="Select Profile (Only profiles with available working hours)"
           placeholder="Choose an employee"
           showRoleFilter={true}
         />

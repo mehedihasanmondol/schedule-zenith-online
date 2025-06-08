@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -34,15 +33,17 @@ export const PayrollGenerationWizard = ({ profiles, workingHours, onRefresh }: P
   const [overlappingPayrolls, setOverlappingPayrolls] = useState<string[]>([]);
   const [isWorkingHoursOpen, setIsWorkingHoursOpen] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [linkedWorkingHoursIds, setLinkedWorkingHoursIds] = useState<Set<string>>(new Set());
   const { toast } = useToast();
 
   useEffect(() => {
     fetchExistingPayrolls();
+    fetchLinkedWorkingHours();
   }, []);
 
   useEffect(() => {
     reloadFilteredData();
-  }, [dateRange]);
+  }, [dateRange, linkedWorkingHoursIds]);
 
   useEffect(() => {
     if (selectedProfileIds.length > 0 && dateRange.start && dateRange.end) {
@@ -54,13 +55,28 @@ export const PayrollGenerationWizard = ({ profiles, workingHours, onRefresh }: P
     }
   }, [selectedProfileIds, filteredWorkingHours, existingPayrolls]);
 
+  const fetchLinkedWorkingHours = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('payroll_working_hours')
+        .select('working_hours_id');
+
+      if (error) throw error;
+
+      const linkedIds = new Set(data?.map(link => link.working_hours_id) || []);
+      setLinkedWorkingHoursIds(linkedIds);
+    } catch (error) {
+      console.error('Error fetching linked working hours:', error);
+    }
+  };
+
   const reloadFilteredData = async () => {
     try {
       setFilterLoading(true);
       
-      console.log('Reloading filtered data with:', { dateRange });
+      console.log('Reloading filtered data with:', { dateRange, linkedWorkingHoursCount: linkedWorkingHoursIds.size });
       
-      // Fetch only approved working hours based on date range
+      // Fetch only approved working hours based on date range that are NOT already linked to payroll
       const { data: workingHoursData, error: whError } = await supabase
         .from('working_hours')
         .select(`
@@ -80,24 +96,30 @@ export const PayrollGenerationWizard = ({ profiles, workingHours, onRefresh }: P
       }
 
       console.log('Fetched approved working hours:', workingHoursData?.length || 0);
+      console.log('Linked working hours to filter out:', linkedWorkingHoursIds.size);
 
-      const typedWorkingHours = (workingHoursData || []).map(wh => ({
+      // Filter out working hours that are already linked to existing payroll records
+      const availableWorkingHours = (workingHoursData || []).filter(wh => 
+        !linkedWorkingHoursIds.has(wh.id)
+      ).map(wh => ({
         ...wh,
         status: wh.status as 'approved'
       })) as WorkingHour[];
 
-      setFilteredWorkingHours(typedWorkingHours);
+      console.log('Available working hours after filtering:', availableWorkingHours.length);
 
-      // Get unique profile IDs from working hours
-      const profileIdsFromWorkingHours = new Set(typedWorkingHours.map(wh => wh.profile_id));
-      console.log('Profile IDs from working hours:', profileIdsFromWorkingHours.size);
+      setFilteredWorkingHours(availableWorkingHours);
 
-      // Filter profiles that have approved working hours in the date range
+      // Get unique profile IDs from available working hours only
+      const profileIdsFromWorkingHours = new Set(availableWorkingHours.map(wh => wh.profile_id));
+      console.log('Profile IDs from available working hours:', profileIdsFromWorkingHours.size);
+
+      // Filter profiles that have available (non-linked) approved working hours in the date range
       let eligibleProfiles = profiles.filter(profile => {
         return profileIdsFromWorkingHours.has(profile.id);
       });
 
-      console.log('Profiles with approved working hours:', eligibleProfiles.length);
+      console.log('Profiles with available working hours:', eligibleProfiles.length);
       setFilteredProfiles(eligibleProfiles);
 
       // Maintain selected profiles if they're still eligible
@@ -160,7 +182,7 @@ export const PayrollGenerationWizard = ({ profiles, workingHours, onRefresh }: P
         const profile = filteredProfiles.find(p => p.id === profileId);
         if (!profile) continue;
 
-        // Get working hours for this profile in date range
+        // Get working hours for this profile in date range (only available ones)
         const profileHours = filteredWorkingHours.filter(wh => 
           wh.profile_id === profileId
         );
@@ -269,9 +291,12 @@ export const PayrollGenerationWizard = ({ profiles, workingHours, onRefresh }: P
 
       toast({
         title: "Success",
-        description: `Generated ${payrollRecords.length} payroll records successfully`
+        description: `Generated ${payrollRecords.length} payroll records successfully. Working hours have been automatically linked.`
       });
 
+      // Refresh linked working hours after successful payroll generation
+      await fetchLinkedWorkingHours();
+      
       setSelectedProfileIds([]);
       setStep(1);
       setPayrollPreview([]);
@@ -318,8 +343,8 @@ export const PayrollGenerationWizard = ({ profiles, workingHours, onRefresh }: P
                     <div className="mb-3 sm:mb-4">
                       <div className="flex items-center gap-2 text-xs sm:text-sm text-blue-600 mb-2">
                         <Calculator className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
-                        <span className="hidden sm:inline">Showing employees with approved working hours for selected period</span>
-                        <span className="sm:hidden">Approved hours only</span>
+                        <span className="hidden sm:inline">Showing employees with available working hours (not linked to existing payroll)</span>
+                        <span className="sm:hidden">Available hours only</span>
                         {filterLoading && <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4 animate-spin shrink-0" />}
                       </div>
                     </div>
@@ -389,7 +414,7 @@ export const PayrollGenerationWizard = ({ profiles, workingHours, onRefresh }: P
                 <div className="mt-4 p-3 sm:p-4 bg-gray-50 rounded-lg">
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 text-xs sm:text-sm">
                     <div className="text-center sm:text-left">
-                      <div className="text-gray-600 mb-1">Eligible</div>
+                      <div className="text-gray-600 mb-1">Available</div>
                       <div className="font-bold text-blue-600">{filteredProfiles.length}</div>
                     </div>
                     <div className="text-center sm:text-left">
@@ -404,7 +429,7 @@ export const PayrollGenerationWizard = ({ profiles, workingHours, onRefresh }: P
                     </div>
                     <div className="text-center sm:text-left col-span-2 sm:col-span-1">
                       <div className="text-gray-600 mb-1">Status</div>
-                      <div className="font-bold text-green-600">Approved</div>
+                      <div className="font-bold text-green-600">Available</div>
                     </div>
                   </div>
                 </div>
@@ -526,7 +551,7 @@ export const PayrollGenerationWizard = ({ profiles, workingHours, onRefresh }: P
 
               {payrollPreview.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
-                  <p className="text-sm sm:text-base">No approved working hours found for the selected period and profiles.</p>
+                  <p className="text-sm sm:text-base">No available working hours found for the selected period and profiles.</p>
                 </div>
               ) : (
                 <>
