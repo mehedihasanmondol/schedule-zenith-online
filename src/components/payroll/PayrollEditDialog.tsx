@@ -4,24 +4,18 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Clock, ChevronDown, ChevronUp, Zap, Link } from "lucide-react";
-import type { Payroll as PayrollType, WorkingHour, PayrollWorkingHours } from "@/types/database";
+import type { Payroll, WorkingHour } from "@/types/database";
 
 interface PayrollEditDialogProps {
-  payroll: PayrollType | null;
+  payroll: Payroll | null;
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: () => void;
+  onUpdate: () => void;
 }
 
-export const PayrollEditDialog = ({ payroll, isOpen, onClose, onSuccess }: PayrollEditDialogProps) => {
-  const [loading, setLoading] = useState(false);
-  const [linkedWorkingHours, setLinkedWorkingHours] = useState<WorkingHour[]>([]);
-  const [isWorkingHoursPreviewOpen, setIsWorkingHoursPreviewOpen] = useState(false);
+export const PayrollEditDialog = ({ payroll, isOpen, onClose, onUpdate }: PayrollEditDialogProps) => {
   const [formData, setFormData] = useState({
     pay_period_start: "",
     pay_period_end: "",
@@ -30,13 +24,14 @@ export const PayrollEditDialog = ({ payroll, isOpen, onClose, onSuccess }: Payro
     gross_pay: 0,
     deductions: 0,
     net_pay: 0,
-    status: 'pending' as 'pending' | 'approved' | 'paid'
+    status: "pending" as const
   });
+  const [loading, setLoading] = useState(false);
+  const [linkedWorkingHours, setLinkedWorkingHours] = useState<WorkingHour[]>([]);
   const { toast } = useToast();
 
-  // Populate form data when payroll changes
   useEffect(() => {
-    if (payroll && isOpen) {
+    if (payroll) {
       setFormData({
         pay_period_start: payroll.pay_period_start,
         pay_period_end: payroll.pay_period_end,
@@ -47,119 +42,66 @@ export const PayrollEditDialog = ({ payroll, isOpen, onClose, onSuccess }: Payro
         net_pay: payroll.net_pay,
         status: payroll.status
       });
-      
-      // Fetch the actually linked working hours from the new table
       fetchLinkedWorkingHours();
     }
-  }, [payroll, isOpen]);
+  }, [payroll]);
 
   const fetchLinkedWorkingHours = async () => {
     if (!payroll) return;
-    
+
     try {
       const { data, error } = await supabase
         .from('payroll_working_hours')
         .select(`
           *,
-          working_hours!inner (
+          working_hours:working_hours_id (
             *,
-            clients!working_hours_client_id_fkey (id, name, company, email, status, created_at, updated_at),
-            projects!working_hours_project_id_fkey (id, name)
+            clients:client_id (id, name, company),
+            projects:project_id (id, name)
           )
         `)
-        .eq('payroll_id', payroll.id)
-        .order('working_hours.date', { ascending: false });
+        .eq('payroll_id', payroll.id);
 
       if (error) throw error;
-      
-      // Extract the working hours from the linked records
-      const workingHours = (data || []).map((item: PayrollWorkingHours & { working_hours: WorkingHour }) => item.working_hours);
-      setLinkedWorkingHours(workingHours);
-      setIsWorkingHoursPreviewOpen(workingHours.length > 0);
+
+      // Transform the data to match WorkingHour type
+      const workingHours = data?.map(item => ({
+        ...item.working_hours,
+        clients: item.working_hours?.clients,
+        projects: item.working_hours?.projects
+      })).filter(Boolean) as WorkingHour[];
+
+      setLinkedWorkingHours(workingHours || []);
     } catch (error) {
       console.error('Error fetching linked working hours:', error);
-      toast({
-        title: "Warning",
-        description: "Could not fetch linked working hours",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const handleInputChange = (field: string, value: string | number) => {
-    setFormData(prev => {
-      const updated = { ...prev, [field]: value };
-      
-      // Recalculate gross pay and net pay when relevant fields change
-      if (field === 'total_hours' || field === 'hourly_rate') {
-        const totalHours = field === 'total_hours' ? Number(value) : updated.total_hours;
-        const hourlyRate = field === 'hourly_rate' ? Number(value) : updated.hourly_rate;
-        updated.gross_pay = totalHours * hourlyRate;
-        updated.net_pay = updated.gross_pay - updated.deductions;
-      }
-      
-      if (field === 'deductions') {
-        updated.net_pay = updated.gross_pay - Number(value);
-      }
-      
-      if (field === 'gross_pay') {
-        updated.net_pay = Number(value) - updated.deductions;
-      }
-      
-      return updated;
-    });
-  };
-
-  const recalculateFromLinkedWorkingHours = () => {
-    if (linkedWorkingHours.length > 0) {
-      const totalHours = linkedWorkingHours.reduce((sum, wh) => sum + wh.total_hours, 0);
-      const avgHourlyRate = linkedWorkingHours.reduce((sum, wh) => sum + (wh.hourly_rate || 0), 0) / linkedWorkingHours.length;
-      const grossPay = totalHours * avgHourlyRate;
-      
-      setFormData(prev => ({
-        ...prev,
-        total_hours: totalHours,
-        hourly_rate: avgHourlyRate,
-        gross_pay: grossPay,
-        net_pay: grossPay - prev.deductions
-      }));
-
-      toast({
-        title: "Recalculated",
-        description: `Payroll recalculated from ${linkedWorkingHours.length} linked working hours`
-      });
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!payroll) return;
-
+    
     setLoading(true);
+
     try {
       const { error } = await supabase
         .from('payroll')
         .update({
           pay_period_start: formData.pay_period_start,
           pay_period_end: formData.pay_period_end,
-          total_hours: Number(formData.total_hours),
-          hourly_rate: Number(formData.hourly_rate),
-          gross_pay: Number(formData.gross_pay),
-          deductions: Number(formData.deductions),
-          net_pay: Number(formData.net_pay),
-          status: formData.status,
-          updated_at: new Date().toISOString()
+          total_hours: formData.total_hours,
+          hourly_rate: formData.hourly_rate,
+          gross_pay: formData.gross_pay,
+          deductions: formData.deductions,
+          net_pay: formData.net_pay,
+          status: formData.status
         })
         .eq('id', payroll.id);
 
       if (error) throw error;
 
-      toast({
-        title: "Success",
-        description: "Payroll record updated successfully"
-      });
-      
-      onSuccess();
+      toast({ title: "Success", description: "Payroll record updated successfully" });
+      onUpdate();
       onClose();
     } catch (error) {
       console.error('Error updating payroll:', error);
@@ -173,60 +115,45 @@ export const PayrollEditDialog = ({ payroll, isOpen, onClose, onSuccess }: Payro
     }
   };
 
-  if (!payroll) return null;
+  const calculatePayroll = (hours: number, rate: number, deductions: number) => {
+    const gross = hours * rate;
+    const net = gross - deductions;
+    setFormData(prev => ({
+      ...prev,
+      gross_pay: gross,
+      net_pay: net
+    }));
+  };
+
+  useEffect(() => {
+    calculatePayroll(formData.total_hours, formData.hourly_rate, formData.deductions);
+  }, [formData.total_hours, formData.hourly_rate, formData.deductions]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Edit Payroll Record - {payroll.profiles?.full_name}</DialogTitle>
+          <DialogTitle>Edit Payroll Record</DialogTitle>
         </DialogHeader>
-        
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="h-10 w-10 bg-blue-600 rounded-full flex items-center justify-center">
-                <span className="font-medium text-white">
-                  {payroll.profiles?.full_name?.split(' ').map(n => n[0]).join('') || 'U'}
-                </span>
-              </div>
-              <div>
-                <h3 className="font-medium text-blue-900">{payroll.profiles?.full_name}</h3>
-                <p className="text-sm text-blue-700">{payroll.profiles?.role}</p>
-              </div>
-            </div>
-            {linkedWorkingHours.length > 0 && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={recalculateFromLinkedWorkingHours}
-                className="w-full flex items-center gap-2"
-              >
-                <Zap className="h-4 w-4" />
-                Recalculate from Linked Working Hours ({linkedWorkingHours.length} entries)
-              </Button>
-            )}
-          </div>
-
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="pay_period_start">Pay Period Start</Label>
+              <Label htmlFor="pay_period_start">Period Start</Label>
               <Input
                 id="pay_period_start"
                 type="date"
                 value={formData.pay_period_start}
-                onChange={(e) => handleInputChange('pay_period_start', e.target.value)}
+                onChange={(e) => setFormData({ ...formData, pay_period_start: e.target.value })}
                 required
               />
             </div>
             <div>
-              <Label htmlFor="pay_period_end">Pay Period End</Label>
+              <Label htmlFor="pay_period_end">Period End</Label>
               <Input
                 id="pay_period_end"
                 type="date"
                 value={formData.pay_period_end}
-                onChange={(e) => handleInputChange('pay_period_end', e.target.value)}
+                onChange={(e) => setFormData({ ...formData, pay_period_end: e.target.value })}
                 required
               />
             </div>
@@ -238,9 +165,9 @@ export const PayrollEditDialog = ({ payroll, isOpen, onClose, onSuccess }: Payro
               <Input
                 id="total_hours"
                 type="number"
-                step="0.01"
+                step="0.5"
                 value={formData.total_hours}
-                onChange={(e) => handleInputChange('total_hours', e.target.value)}
+                onChange={(e) => setFormData({ ...formData, total_hours: parseFloat(e.target.value) || 0 })}
                 required
               />
             </div>
@@ -251,121 +178,59 @@ export const PayrollEditDialog = ({ payroll, isOpen, onClose, onSuccess }: Payro
                 type="number"
                 step="0.01"
                 value={formData.hourly_rate}
-                onChange={(e) => handleInputChange('hourly_rate', e.target.value)}
+                onChange={(e) => setFormData({ ...formData, hourly_rate: parseFloat(e.target.value) || 0 })}
                 required
               />
             </div>
           </div>
-
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <Label htmlFor="gross_pay">Gross Pay</Label>
-              <Input
-                id="gross_pay"
-                type="number"
-                step="0.01"
-                value={formData.gross_pay}
-                onChange={(e) => handleInputChange('gross_pay', e.target.value)}
-                required
-              />
-            </div>
-            <div>
-              <Label htmlFor="deductions">Deductions</Label>
-              <Input
-                id="deductions"
-                type="number"
-                step="0.01"
-                value={formData.deductions}
-                onChange={(e) => handleInputChange('deductions', e.target.value)}
-                required
-              />
-            </div>
-            <div>
-              <Label htmlFor="net_pay">Net Pay</Label>
-              <Input
-                id="net_pay"
-                type="number"
-                step="0.01"
-                value={formData.net_pay}
-                readOnly
-                className="bg-gray-100"
-              />
-            </div>
-          </div>
-
-          {/* Real-time calculation preview */}
-          {formData.total_hours > 0 && formData.hourly_rate > 0 && (
-            <div className="bg-gray-50 p-3 rounded">
-              <div className="flex justify-between text-sm">
-                <span>Calculated Gross Pay:</span>
-                <span>${(formData.total_hours * formData.hourly_rate).toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span>Deductions:</span>
-                <span>-${formData.deductions.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between font-medium">
-                <span>Calculated Net Pay:</span>
-                <span>${(formData.total_hours * formData.hourly_rate - formData.deductions).toFixed(2)}</span>
-              </div>
-            </div>
-          )}
 
           <div>
-            <Label htmlFor="status">Status</Label>
-            <Select value={formData.status} onValueChange={(value: 'pending' | 'approved' | 'paid') => handleInputChange('status', value)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="approved">Approved</SelectItem>
-                {payroll.status === 'paid' && <SelectItem value="paid">Paid</SelectItem>}
-              </SelectContent>
-            </Select>
+            <Label htmlFor="deductions">Deductions</Label>
+            <Input
+              id="deductions"
+              type="number"
+              step="0.01"
+              value={formData.deductions}
+              onChange={(e) => setFormData({ ...formData, deductions: parseFloat(e.target.value) || 0 })}
+            />
           </div>
 
           {linkedWorkingHours.length > 0 && (
-            <Collapsible open={isWorkingHoursPreviewOpen} onOpenChange={setIsWorkingHoursPreviewOpen}>
-              <CollapsibleTrigger asChild>
-                <Button type="button" variant="outline" className="w-full justify-between">
-                  <span className="flex items-center gap-2">
-                    <Link className="h-4 w-4" />
-                    Linked Working Hours ({linkedWorkingHours.length} entries)
-                  </span>
-                  {isWorkingHoursPreviewOpen ? (
-                    <ChevronUp className="h-4 w-4" />
-                  ) : (
-                    <ChevronDown className="h-4 w-4" />
-                  )}
-                </Button>
-              </CollapsibleTrigger>
-              <CollapsibleContent className="mt-3">
-                <div className="border rounded-lg p-4">
-                  <div className="max-h-40 overflow-y-auto space-y-2">
-                    {linkedWorkingHours.map((wh) => (
-                      <div key={wh.id} className="flex justify-between items-center text-sm bg-green-50 p-2 rounded border border-green-200">
-                        <div>
-                          <span className="font-medium">{new Date(wh.date).toLocaleDateString()}</span>
-                          <span className="text-gray-600 ml-2">
-                            {wh.clients?.company || 'N/A'} - {wh.projects?.name || 'N/A'}
-                          </span>
-                          <div className="text-xs text-green-700 flex items-center gap-1 mt-1">
-                            <Link className="h-3 w-3" />
-                            Linked to this payroll
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div>{wh.total_hours}h × ${wh.hourly_rate}/hr</div>
-                          <div className="font-medium">${(wh.total_hours * (wh.hourly_rate || 0)).toFixed(2)}</div>
-                        </div>
-                      </div>
-                    ))}
+            <div className="border rounded-lg p-4">
+              <h4 className="font-medium mb-3">Linked Working Hours</h4>
+              <div className="max-h-40 overflow-y-auto space-y-2">
+                {linkedWorkingHours.map((wh) => (
+                  <div key={wh.id} className="flex justify-between items-center text-sm p-2 bg-gray-50 rounded">
+                    <div>
+                      <span className="font-medium">{new Date(wh.date).toLocaleDateString()}</span>
+                      <span className="text-gray-600 ml-2">
+                        {wh.clients?.company || 'N/A'} - {wh.projects?.name || 'N/A'}
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <div>{wh.total_hours}h × ${wh.hourly_rate}/hr</div>
+                      <div className="font-medium">${(wh.total_hours * (wh.hourly_rate || 0)).toFixed(2)}</div>
+                    </div>
                   </div>
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
+                ))}
+              </div>
+            </div>
           )}
+
+          <div className="bg-gray-50 p-3 rounded">
+            <div className="flex justify-between text-sm">
+              <span>Gross Pay:</span>
+              <span>${formData.gross_pay.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span>Deductions:</span>
+              <span>-${formData.deductions.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between font-medium">
+              <span>Net Pay:</span>
+              <span>${formData.net_pay.toFixed(2)}</span>
+            </div>
+          </div>
 
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={onClose}>

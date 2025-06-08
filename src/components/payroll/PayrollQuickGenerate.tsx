@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -54,14 +53,22 @@ export const PayrollQuickGenerate = ({
 
   const [previewWorkingHours, setPreviewWorkingHours] = useState<WorkingHourWithLinkStatus[]>([]);
 
-  // Fetch linked working hours on component mount
+  // Fetch linked working hours on component mount and when dialog opens
   useEffect(() => {
     fetchLinkedWorkingHours();
   }, []);
 
+  useEffect(() => {
+    if (isDialogOpen || isInDialog) {
+      fetchLinkedWorkingHours();
+    }
+  }, [isDialogOpen, isInDialog]);
+
   // Filter available working hours when linkedWorkingHoursIds changes
   useEffect(() => {
-    const available = workingHours.filter(wh => !linkedWorkingHoursIds.has(wh.id));
+    const available = workingHours.filter(wh => 
+      !linkedWorkingHoursIds.has(wh.id) && wh.status === 'approved'
+    );
     setAvailableWorkingHours(available);
   }, [workingHours, linkedWorkingHoursIds]);
 
@@ -82,8 +89,8 @@ export const PayrollQuickGenerate = ({
 
   // Auto-fill form when preSelectedProfile is provided
   useEffect(() => {
-    if (preSelectedProfile && isDialogOpen) {
-      // Use available working hours instead of all working hours
+    if (preSelectedProfile && (isDialogOpen || isInDialog)) {
+      // Use only available (unlinked, approved) working hours
       const profileWorkingHours = availableWorkingHours.filter(wh => wh.profile_id === preSelectedProfile.id);
       
       if (profileWorkingHours.length > 0) {
@@ -110,37 +117,25 @@ export const PayrollQuickGenerate = ({
           status: "pending"
         });
         
-        checkWorkingHoursLinkStatus(profileWorkingHours);
+        setPreviewWorkingHours(profileWorkingHours.map(wh => ({ ...wh, isLinkedToPayroll: false })));
         setIsWorkingHoursPreviewOpen(true);
+      } else {
+        // No available working hours for this profile
+        setFormData({
+          profile_id: preSelectedProfile.id,
+          pay_period_start: "",
+          pay_period_end: "",
+          total_hours: 0,
+          hourly_rate: preSelectedProfile.hourly_rate || 0,
+          gross_pay: 0,
+          deductions: 0,
+          net_pay: 0,
+          status: "pending"
+        });
+        setPreviewWorkingHours([]);
       }
     }
-  }, [preSelectedProfile, isDialogOpen, availableWorkingHours]);
-
-  const checkWorkingHoursLinkStatus = async (hoursToCheck: WorkingHour[]) => {
-    try {
-      const workingHourIds = hoursToCheck.map(wh => wh.id);
-      
-      const { data: linkedHours, error } = await supabase
-        .from('payroll_working_hours')
-        .select('working_hours_id, payroll_id')
-        .in('working_hours_id', workingHourIds);
-
-      if (error) throw error;
-
-      const linkedMap = new Map(linkedHours?.map(link => [link.working_hours_id, link.payroll_id]) || []);
-
-      const hoursWithStatus: WorkingHourWithLinkStatus[] = hoursToCheck.map(wh => ({
-        ...wh,
-        isLinkedToPayroll: linkedMap.has(wh.id),
-        linkedPayrollId: linkedMap.get(wh.id)
-      }));
-
-      setPreviewWorkingHours(hoursWithStatus);
-    } catch (error) {
-      console.error('Error checking working hours link status:', error);
-      setPreviewWorkingHours(hoursToCheck);
-    }
-  };
+  }, [preSelectedProfile, isDialogOpen, isInDialog, availableWorkingHours]);
 
   const calculatePayroll = (hours: number, rate: number, deductions: number) => {
     const gross = hours * rate;
@@ -164,11 +159,17 @@ export const PayrollQuickGenerate = ({
         }]);
 
       if (error) throw error;
-      toast({ title: "Success", description: "Payroll record created successfully. Working hours have been automatically linked." });
+      
+      toast({ 
+        title: "Success", 
+        description: `Payroll record created successfully for ${preSelectedProfile?.full_name || 'selected employee'}. Working hours have been automatically linked.` 
+      });
       
       if (!isInDialog) {
         setIsDialogOpen(false);
       }
+      
+      // Reset form
       setFormData({
         profile_id: "",
         pay_period_start: "",
@@ -199,7 +200,7 @@ export const PayrollQuickGenerate = ({
 
   useEffect(() => {
     if (formData.profile_id && formData.pay_period_start && formData.pay_period_end && !preSelectedProfile) {
-      // Use available working hours instead of all working hours
+      // Use only available (unlinked, approved) working hours
       const profileWorkingHours = availableWorkingHours.filter(wh => 
         wh.profile_id === formData.profile_id &&
         wh.date >= formData.pay_period_start &&
@@ -217,20 +218,20 @@ export const PayrollQuickGenerate = ({
         hourly_rate: avgHourlyRate
       }));
       
-      checkWorkingHoursLinkStatus(profileWorkingHours);
+      setPreviewWorkingHours(profileWorkingHours.map(wh => ({ ...wh, isLinkedToPayroll: false })));
     }
   }, [formData.profile_id, formData.pay_period_start, formData.pay_period_end, availableWorkingHours, preSelectedProfile]);
 
   const buttonText = preSelectedProfile ? "Quick Generate" : "Create Payroll";
   const buttonIcon = preSelectedProfile ? <Zap className="h-4 w-4" /> : <Plus className="h-4 w-4" />;
 
-  const availableHours = previewWorkingHours.filter(wh => !wh.isLinkedToPayroll);
-  const linkedHours = previewWorkingHours.filter(wh => wh.isLinkedToPayroll);
-
-  // Filter profiles that have available working hours
+  // Filter profiles that have available (unlinked, approved) working hours
   const profilesWithAvailableHours = profiles.filter(profile => 
     availableWorkingHours.some(wh => wh.profile_id === profile.id)
   );
+
+  const hasAvailableHours = previewWorkingHours.length > 0;
+  const allHoursLinked = previewWorkingHours.every(wh => wh.isLinkedToPayroll);
 
   const formContent = (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -239,8 +240,8 @@ export const PayrollQuickGenerate = ({
           profiles={profilesWithAvailableHours}
           selectedProfileId={formData.profile_id}
           onProfileSelect={(profileId) => setFormData({ ...formData, profile_id: profileId })}
-          label="Select Profile (Only profiles with available working hours)"
-          placeholder="Choose an employee"
+          label="Select Profile"
+          placeholder="Choose an employee with available working hours"
           showRoleFilter={true}
         />
       )}
@@ -256,6 +257,9 @@ export const PayrollQuickGenerate = ({
             <div>
               <h3 className="font-medium text-blue-900">{preSelectedProfile.full_name}</h3>
               <p className="text-sm text-blue-700">{preSelectedProfile.role}</p>
+              {!hasAvailableHours && (
+                <p className="text-xs text-orange-600 mt-1">No available working hours found</p>
+              )}
             </div>
           </div>
         </div>
@@ -343,7 +347,7 @@ export const PayrollQuickGenerate = ({
             <Button variant="outline" className="w-full justify-between">
               <span className="flex items-center gap-2">
                 <Clock className="h-4 w-4" />
-                Working Hours Preview ({availableHours.length} available, {linkedHours.length} already linked)
+                Working Hours Preview ({previewWorkingHours.length} hours available)
               </span>
               {isWorkingHoursPreviewOpen ? (
                 <ChevronUp className="h-4 w-4" />
@@ -356,22 +360,16 @@ export const PayrollQuickGenerate = ({
             <div className="border rounded-lg p-4">
               <div className="max-h-40 overflow-y-auto space-y-2">
                 {previewWorkingHours.map((wh) => (
-                  <div key={wh.id} className={`flex justify-between items-center text-sm p-2 rounded ${
-                    wh.isLinkedToPayroll 
-                      ? 'bg-orange-50 border border-orange-200' 
-                      : 'bg-gray-50'
-                  }`}>
+                  <div key={wh.id} className="flex justify-between items-center text-sm p-2 bg-green-50 border border-green-200 rounded">
                     <div>
                       <span className="font-medium">{new Date(wh.date).toLocaleDateString()}</span>
                       <span className="text-gray-600 ml-2">
                         {wh.clients?.company || 'N/A'} - {wh.projects?.name || 'N/A'}
                       </span>
-                      {wh.isLinkedToPayroll && (
-                        <div className="text-xs text-orange-700 flex items-center gap-1 mt-1">
-                          <AlertTriangle className="h-3 w-3" />
-                          Already linked to another payroll
-                        </div>
-                      )}
+                      <div className="text-xs text-green-700 flex items-center gap-1 mt-1">
+                        <Clock className="h-3 w-3" />
+                        Available for payroll
+                      </div>
                     </div>
                     <div className="text-right">
                       <div>{wh.total_hours}h × ${wh.hourly_rate}/hr</div>
@@ -380,24 +378,28 @@ export const PayrollQuickGenerate = ({
                   </div>
                 ))}
               </div>
-              
-              {linkedHours.length > 0 && (
-                <div className="mt-3 p-2 bg-orange-50 border border-orange-200 rounded text-sm">
-                  <div className="flex items-center gap-1 text-orange-700 font-medium">
-                    <AlertTriangle className="h-4 w-4" />
-                    Warning: {linkedHours.length} working hour(s) already linked to other payrolls
-                  </div>
-                  <p className="text-orange-600 mt-1">
-                    Only {availableHours.length} working hour(s) will be linked to this new payroll.
-                  </p>
-                </div>
-              )}
             </div>
           </CollapsibleContent>
         </Collapsible>
       )}
 
-      <Button type="submit" disabled={loading} className="w-full">
+      {preSelectedProfile && !hasAvailableHours && (
+        <div className="p-3 bg-orange-50 border border-orange-200 rounded text-sm">
+          <div className="flex items-center gap-1 text-orange-700 font-medium">
+            <AlertTriangle className="h-4 w-4" />
+            No Available Working Hours
+          </div>
+          <p className="text-orange-600 mt-1">
+            This employee has no approved working hours available for payroll generation. All working hours may already be linked to existing payroll records.
+          </p>
+        </div>
+      )}
+
+      <Button 
+        type="submit" 
+        disabled={loading || formData.total_hours === 0 || !hasAvailableHours} 
+        className="w-full"
+      >
         {loading ? "Creating..." : buttonText}
       </Button>
     </form>
@@ -412,7 +414,11 @@ export const PayrollQuickGenerate = ({
   return (
     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
       <DialogTrigger asChild>
-        <Button className="flex items-center gap-2" variant={preSelectedProfile ? "default" : "outline"}>
+        <Button 
+          className="flex items-center gap-2" 
+          variant={preSelectedProfile ? "default" : "outline"}
+          disabled={preSelectedProfile && !hasAvailableHours}
+        >
           {buttonIcon}
           {buttonText}
         </Button>
