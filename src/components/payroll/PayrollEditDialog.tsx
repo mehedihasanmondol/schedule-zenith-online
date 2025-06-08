@@ -24,7 +24,7 @@ export const PayrollEditDialog = ({ payroll, isOpen, onClose, onUpdate }: Payrol
     gross_pay: 0,
     deductions: 0,
     net_pay: 0,
-    status: "pending" as const
+    status: "pending" as "pending" | "approved" | "paid"
   });
   const [loading, setLoading] = useState(false);
   const [linkedWorkingHours, setLinkedWorkingHours] = useState<WorkingHour[]>([]);

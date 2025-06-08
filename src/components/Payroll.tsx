@@ -18,6 +18,9 @@ export const PayrollComponent = () => {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [workingHours, setWorkingHours] = useState<WorkingHour[]>([]);
   const [profilesWithHours, setProfilesWithHours] = useState<Profile[]>([]);
+  const [profilesWithAvailableHours, setProfilesWithAvailableHours] = useState<Profile[]>([]);
+  const [availableWorkingHours, setAvailableWorkingHours] = useState<WorkingHour[]>([]);
+  const [linkedWorkingHoursIds, setLinkedWorkingHoursIds] = useState<Set<string>>(new Set());
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -37,7 +40,24 @@ export const PayrollComponent = () => {
     fetchWorkingHours();
     fetchBankAccounts();
     fetchClientsAndProjects();
+    fetchLinkedWorkingHours();
   }, []);
+
+  const fetchLinkedWorkingHours = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('payroll_working_hours')
+        .select('working_hours_id');
+
+      if (error) throw error;
+
+      const linkedIds = new Set(data?.map(link => link.working_hours_id) || []);
+      console.log('Linked working hours to filter out:', linkedIds.size);
+      setLinkedWorkingHoursIds(linkedIds);
+    } catch (error) {
+      console.error('Error fetching linked working hours:', error);
+    }
+  };
 
   const fetchPayrolls = async () => {
     try {
@@ -135,6 +155,7 @@ export const PayrollComponent = () => {
         .order('date', { ascending: false });
 
       if (error) throw error;
+      console.log('Fetched approved working hours:', data.length);
       setWorkingHours(data as WorkingHour[]);
       
       const profileIds = [...new Set(data.map(wh => wh.profile_id))];
@@ -145,13 +166,21 @@ export const PayrollComponent = () => {
     }
   };
 
+  // Filter available working hours when linkedWorkingHoursIds or workingHours changes
   useEffect(() => {
-    if (profiles.length > 0 && workingHours.length > 0) {
-      const profileIds = [...new Set(workingHours.map(wh => wh.profile_id))];
-      const profilesWithApprovedHours = profiles.filter(p => profileIds.includes(p.id));
-      setProfilesWithHours(profilesWithApprovedHours);
-    }
-  }, [profiles, workingHours]);
+    const available = workingHours.filter(wh => 
+      !linkedWorkingHoursIds.has(wh.id) && wh.status === 'approved'
+    );
+    console.log('Available working hours after filtering:', available.length);
+    setAvailableWorkingHours(available);
+    
+    // Update profiles with available hours
+    const profileIds = [...new Set(available.map(wh => wh.profile_id))];
+    console.log('Profile IDs from available working hours:', profileIds.length);
+    const profilesWithAvailable = profiles.filter(p => profileIds.includes(p.id));
+    console.log('Profiles with available working hours:', profilesWithAvailable.length);
+    setProfilesWithAvailableHours(profilesWithAvailable);
+  }, [workingHours, linkedWorkingHoursIds, profiles]);
 
   const handleMarkAsPaid = (payroll: PayrollType) => {
     setSelectedPayrollForPayment(payroll);
@@ -432,7 +461,7 @@ export const PayrollComponent = () => {
                   Quick Payroll Generator
                 </CardTitle>
                 <div className="text-sm text-gray-600">
-                  {profilesWithHours.length} employees with approved hours available
+                  {profilesWithAvailableHours.length} employees with approved hours available
                 </div>
               </div>
             </CardHeader>
@@ -448,18 +477,18 @@ export const PayrollComponent = () => {
                   </p>
                 </div>
 
-                {profilesWithHours.length === 0 ? (
+                {profilesWithAvailableHours.length === 0 ? (
                   <div className="text-center py-12">
                     <Clock className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">No Approved Hours Available</h3>
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No Available Hours</h3>
                     <p className="text-gray-600">
-                      No employees have approved working hours available for payroll generation.
+                      No employees have approved working hours available for payroll generation. All working hours may already be linked to existing payroll records.
                     </p>
                   </div>
                 ) : (
                   <div className="grid gap-4">
-                    {profilesWithHours.map((profile) => {
-                      const profileHours = workingHours.filter(wh => wh.profile_id === profile.id);
+                    {profilesWithAvailableHours.map((profile) => {
+                      const profileHours = availableWorkingHours.filter(wh => wh.profile_id === profile.id);
                       const totalHours = profileHours.reduce((sum, wh) => sum + wh.total_hours, 0);
                       const avgRate = profileHours.length > 0 
                         ? profileHours.reduce((sum, wh) => sum + (wh.hourly_rate || 0), 0) / profileHours.length
@@ -508,8 +537,8 @@ export const PayrollComponent = () => {
                             <div className="flex justify-end">
                               <PayrollQuickGenerate
                                 profiles={profiles}
-                                profilesWithHours={profilesWithHours}
-                                workingHours={workingHours}
+                                profilesWithHours={profilesWithAvailableHours}
+                                workingHours={availableWorkingHours}
                                 onRefresh={fetchPayrolls}
                                 preSelectedProfile={profile}
                               />
@@ -553,9 +582,12 @@ export const PayrollComponent = () => {
                             
                             <PayrollQuickGenerate
                               profiles={profiles}
-                              profilesWithHours={profilesWithHours}
-                              workingHours={workingHours}
-                              onRefresh={fetchPayrolls}
+                              profilesWithHours={profilesWithAvailableHours}
+                              workingHours={availableWorkingHours}
+                              onRefresh={() => {
+                                fetchPayrolls();
+                                fetchLinkedWorkingHours();
+                              }}
                               preSelectedProfile={profile}
                             />
                           </div>
@@ -582,7 +614,10 @@ export const PayrollComponent = () => {
         payroll={selectedPayrollForEdit}
         isOpen={showPayrollEdit}
         onClose={() => setShowPayrollEdit(false)}
-        onSuccess={fetchPayrolls}
+        onUpdate={() => {
+          fetchPayrolls();
+          fetchLinkedWorkingHours();
+        }}
       />
 
       {/* Bank Selection Dialog */}
