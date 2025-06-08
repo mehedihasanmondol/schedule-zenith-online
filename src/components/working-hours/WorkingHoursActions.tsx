@@ -40,8 +40,7 @@ export const WorkingHoursActions = ({
       {
         label: "Delete",
         onClick: () => onDelete(workingHour.id),
-        icon: <Trash2 className="h-4 w-4" />,
-        destructive: true
+        icon: <Trash2 className="h-4 w-4" />
       }
     );
   }

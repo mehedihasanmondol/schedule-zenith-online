@@ -1,5 +1,5 @@
 
-import { ActionDropdown } from "@/components/ui/action-dropdown";
+import { ActionDropdown, ActionItem } from "@/components/ui/action-dropdown";
 import { Edit, Trash2, Eye } from "lucide-react";
 import type { Payroll as PayrollType } from "@/types/database";
 
@@ -13,7 +13,7 @@ interface PayrollActionsProps {
 export const PayrollActions = ({ payroll, onEdit, onDelete, onView }: PayrollActionsProps) => {
   const canEditDelete = payroll.status !== 'paid';
 
-  const items = [
+  const items: ActionItem[] = [
     {
       label: "View Details",
       onClick: () => onView(payroll),

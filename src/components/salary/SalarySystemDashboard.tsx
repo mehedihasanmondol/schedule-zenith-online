@@ -80,80 +80,91 @@ export const SalarySystemDashboard = () => {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 sm:space-y-6 p-2 sm:p-4 lg:p-6">
+      {/* Mobile-friendly header */}
+      <div className="flex flex-col space-y-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
         <div className="flex items-center gap-3">
-          <Calculator className="h-8 w-8 text-green-600" />
+          <Calculator className="h-6 w-6 sm:h-8 sm:w-8 text-green-600" />
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Comprehensive Salary System</h1>
-            <p className="text-gray-600">Manage payroll, salary sheets, and reports</p>
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">Salary System</h1>
+            <p className="text-sm sm:text-base text-gray-600">Manage payroll, salary sheets, and reports with automatic working hours linking</p>
           </div>
         </div>
       </div>
 
-      {/* Enhanced Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      {/* Mobile-optimized Statistics Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Total Payroll</CardTitle>
-            <DollarSign className="h-4 w-4 text-green-600" />
+            <CardTitle className="text-xs sm:text-sm font-medium text-gray-600">Total Payroll</CardTitle>
+            <DollarSign className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 shrink-0" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">${totalPayroll.toFixed(2)}</div>
-            <p className="text-xs text-muted-foreground">Net pay amount</p>
+            <div className="text-lg sm:text-xl lg:text-2xl font-bold text-green-600">${totalPayroll.toFixed(2)}</div>
+            <p className="text-xs text-muted-foreground hidden sm:block">Net pay amount</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Total Hours</CardTitle>
-            <Calendar className="h-4 w-4 text-blue-600" />
+            <CardTitle className="text-xs sm:text-sm font-medium text-gray-600">Total Hours</CardTitle>
+            <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 shrink-0" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-blue-600">{totalHours.toFixed(1)}</div>
-            <p className="text-xs text-muted-foreground">Approved hours</p>
+            <div className="text-lg sm:text-xl lg:text-2xl font-bold text-blue-600">{totalHours.toFixed(1)}</div>
+            <p className="text-xs text-muted-foreground hidden sm:block">Approved hours</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Active Profiles</CardTitle>
-            <Users className="h-4 w-4 text-purple-600" />
+            <CardTitle className="text-xs sm:text-sm font-medium text-gray-600">Active Profiles</CardTitle>
+            <Users className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600 shrink-0" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-purple-600">{profiles.length}</div>
-            <p className="text-xs text-muted-foreground">Team members</p>
+            <div className="text-lg sm:text-xl lg:text-2xl font-bold text-purple-600">{profiles.length}</div>
+            <p className="text-xs text-muted-foreground hidden sm:block">Team members</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Pending Payrolls</CardTitle>
-            <FileText className="h-4 w-4 text-orange-600" />
+            <CardTitle className="text-xs sm:text-sm font-medium text-gray-600">Pending</CardTitle>
+            <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-orange-600 shrink-0" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-600">{pendingPayrolls}</div>
-            <p className="text-xs text-muted-foreground">Require processing</p>
+            <div className="text-lg sm:text-xl lg:text-2xl font-bold text-orange-600">{pendingPayrolls}</div>
+            <p className="text-xs text-muted-foreground hidden sm:block">Require processing</p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="col-span-2 sm:col-span-1">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Salary Payments</CardTitle>
-            <DollarSign className="h-4 w-4 text-emerald-600" />
+            <CardTitle className="text-xs sm:text-sm font-medium text-gray-600">Payments</CardTitle>
+            <DollarSign className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600 shrink-0" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-emerald-600">${totalSalaryTransactions.toFixed(2)}</div>
-            <p className="text-xs text-muted-foreground">Bank transactions</p>
+            <div className="text-lg sm:text-xl lg:text-2xl font-bold text-emerald-600">${totalSalaryTransactions.toFixed(2)}</div>
+            <p className="text-xs text-muted-foreground hidden sm:block">Bank transactions</p>
           </CardContent>
         </Card>
       </div>
 
+      {/* Mobile-friendly Tabs */}
       <Tabs defaultValue="salary-sheets" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="salary-sheets">Salary Sheets</TabsTrigger>
-          <TabsTrigger value="payroll-generation">Payroll Generation</TabsTrigger>
-          <TabsTrigger value="reports">Reports & Analytics</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-3 h-auto">
+          <TabsTrigger value="salary-sheets" className="text-xs sm:text-sm py-2">
+            <span className="sm:hidden">Sheets</span>
+            <span className="hidden sm:inline">Salary Sheets</span>
+          </TabsTrigger>
+          <TabsTrigger value="payroll-generation" className="text-xs sm:text-sm py-2">
+            <span className="sm:hidden">Generate</span>
+            <span className="hidden sm:inline">Payroll Generation</span>
+          </TabsTrigger>
+          <TabsTrigger value="reports" className="text-xs sm:text-sm py-2">
+            <span className="sm:hidden">Reports</span>
+            <span className="hidden sm:inline">Reports & Analytics</span>
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="salary-sheets">

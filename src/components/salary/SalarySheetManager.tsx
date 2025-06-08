@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { FileText, Printer, Download, Eye, Calendar, DollarSign, Trash2, CreditCard, Check } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { FileText, Printer, Download, Eye, Calendar, DollarSign, Trash2, CreditCard, Check, Edit, Search, Filter } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { Payroll, Profile, BankAccount } from "@/types/database";
@@ -12,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { SalarySheetPrintView } from "./SalarySheetPrintView";
 import { ActionDropdown } from "@/components/ui/action-dropdown";
 import { PayrollDetailsDialog } from "./PayrollDetailsDialog";
+import { PayrollEditDialog } from "@/components/payroll/PayrollEditDialog";
 
 interface SalarySheetManagerProps {
   payrolls: Payroll[];
@@ -30,14 +32,37 @@ export const SalarySheetManager = ({ payrolls: initialPayrolls, profiles, onRefr
   const [selectedBankAccount, setSelectedBankAccount] = useState<string>("");
   const [selectedPayrolls, setSelectedPayrolls] = useState<string[]>([]);
   const [selectedPayrollForView, setSelectedPayrollForView] = useState<Payroll | null>(null);
+  const [selectedPayrollForEdit, setSelectedPayrollForEdit] = useState<Payroll | null>(null);
   const [showPayrollDetails, setShowPayrollDetails] = useState(false);
+  const [showPayrollEdit, setShowPayrollEdit] = useState(false);
   const [bankBalance, setBankBalance] = useState<number>(0);
+  
+  // Date filter states
+  const [dateShortcut, setDateShortcut] = useState("current-week");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  
   const { toast } = useToast();
 
   // Update local payrolls when prop changes
   useEffect(() => {
     setPayrolls(initialPayrolls);
   }, [initialPayrolls]);
+
+  // Set default dates to current week
+  useEffect(() => {
+    const today = new Date();
+    const currentDay = today.getDay();
+    const mondayDate = new Date(today);
+    mondayDate.setDate(today.getDate() - (currentDay === 0 ? 6 : currentDay - 1));
+    
+    const sundayDate = new Date(mondayDate);
+    sundayDate.setDate(mondayDate.getDate() + 6);
+    
+    setStartDate(mondayDate.toISOString().split('T')[0]);
+    setEndDate(sundayDate.toISOString().split('T')[0]);
+  }, []);
 
   useEffect(() => {
     groupPayrollsByPeriod();
@@ -50,6 +75,88 @@ export const SalarySheetManager = ({ payrolls: initialPayrolls, profiles, onRefr
       fetchBankBalance();
     }
   }, [selectedBankAccount]);
+
+  const handleDateShortcut = (shortcut: string) => {
+    setDateShortcut(shortcut);
+    const today = new Date();
+    const currentYear = today.getFullYear();
+    const currentMonth = today.getMonth();
+    
+    let start: Date, end: Date;
+    
+    switch (shortcut) {
+      case "last-week":
+        const lastWeekStart = new Date(today);
+        lastWeekStart.setDate(today.getDate() - today.getDay() - 6);
+        const lastWeekEnd = new Date(lastWeekStart);
+        lastWeekEnd.setDate(lastWeekStart.getDate() + 6);
+        start = lastWeekStart;
+        end = lastWeekEnd;
+        break;
+        
+      case "current-week":
+        const currentDay = today.getDay();
+        const mondayDate = new Date(today);
+        mondayDate.setDate(today.getDate() - (currentDay === 0 ? 6 : currentDay - 1));
+        const sundayDate = new Date(mondayDate);
+        sundayDate.setDate(mondayDate.getDate() + 6);
+        start = mondayDate;
+        end = sundayDate;
+        break;
+        
+      case "last-month":
+        start = new Date(currentYear, currentMonth - 1, 1);
+        end = new Date(currentYear, currentMonth, 0);
+        break;
+        
+      case "this-year":
+        start = new Date(currentYear, 0, 1);
+        end = new Date(currentYear, 11, 31);
+        break;
+        
+      default:
+        const monthNames = [
+          "january", "february", "march", "april", "may", "june",
+          "july", "august", "september", "october", "november", "december"
+        ];
+        const monthIndex = monthNames.indexOf(shortcut.toLowerCase());
+        if (monthIndex !== -1) {
+          start = new Date(currentYear, monthIndex, 1);
+          end = new Date(currentYear, monthIndex + 1, 0);
+        } else {
+          return;
+        }
+    }
+    
+    setStartDate(start.toISOString().split('T')[0]);
+    setEndDate(end.toISOString().split('T')[0]);
+  };
+
+  const generateShortcutOptions = () => {
+    const today = new Date();
+    const currentMonth = today.getMonth();
+    const monthNames = [
+      "January", "February", "March", "April", "May", "June",
+      "July", "August", "September", "October", "November", "December"
+    ];
+    
+    const options = [
+      { value: "last-week", label: "Last Week" },
+      { value: "current-week", label: "Current Week" },
+      { value: "last-month", label: "Last Month" },
+    ];
+    
+    for (let i = currentMonth; i >= 0; i--) {
+      options.push({
+        value: monthNames[i].toLowerCase(),
+        label: monthNames[i]
+      });
+    }
+    
+    options.push({ value: "this-year", label: "This Year" });
+    
+    return options;
+  };
 
   const fetchBankAccounts = async () => {
     try {
@@ -135,25 +242,72 @@ export const SalarySheetManager = ({ payrolls: initialPayrolls, profiles, onRefr
     }
   };
 
-  const filteredPayrolls = selectedPeriod ? groupedPayrolls[selectedPeriod] || [] : [];
-  
-  const searchFilteredPayrolls = filteredPayrolls.filter(payroll =>
-    payroll.profiles?.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Apply filters to payrolls
+  const getFilteredPayrolls = () => {
+    let filtered = payrolls;
 
-  const totalGrossPay = searchFilteredPayrolls.reduce((sum, p) => sum + p.gross_pay, 0);
-  const totalDeductions = searchFilteredPayrolls.reduce((sum, p) => sum + p.deductions, 0);
-  const totalNetPay = searchFilteredPayrolls.reduce((sum, p) => sum + p.net_pay, 0);
-  const totalHours = searchFilteredPayrolls.reduce((sum, p) => sum + p.total_hours, 0);
+    // Apply date filter
+    if (startDate && endDate) {
+      filtered = filtered.filter(payroll => {
+        const payrollStart = new Date(payroll.pay_period_start);
+        const payrollEnd = new Date(payroll.pay_period_end);
+        const filterStart = new Date(startDate);
+        const filterEnd = new Date(endDate);
+        
+        return (payrollStart >= filterStart && payrollStart <= filterEnd) ||
+               (payrollEnd >= filterStart && payrollEnd <= filterEnd) ||
+               (payrollStart <= filterStart && payrollEnd >= filterEnd);
+      });
+    }
+
+    // Apply status filter
+    if (statusFilter !== "all") {
+      filtered = filtered.filter(payroll => payroll.status === statusFilter);
+    }
+
+    // Apply search filter
+    if (searchTerm) {
+      filtered = filtered.filter(payroll =>
+        payroll.profiles?.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    return filtered;
+  };
+
+  const filteredPayrolls = getFilteredPayrolls();
+
+  // Group filtered payrolls by period
+  const groupFilteredPayrollsByPeriod = () => {
+    const grouped: Record<string, Payroll[]> = {};
+    
+    filteredPayrolls.forEach(payroll => {
+      const periodKey = `${payroll.pay_period_start} - ${payroll.pay_period_end}`;
+      if (!grouped[periodKey]) {
+        grouped[periodKey] = [];
+      }
+      grouped[periodKey].push(payroll);
+    });
+
+    return grouped;
+  };
+
+  const filteredGroupedPayrolls = groupFilteredPayrollsByPeriod();
+  const currentPeriodPayrolls = selectedPeriod ? (filteredGroupedPayrolls[selectedPeriod] || []) : [];
+
+  const totalGrossPay = currentPeriodPayrolls.reduce((sum, p) => sum + p.gross_pay, 0);
+  const totalDeductions = currentPeriodPayrolls.reduce((sum, p) => sum + p.deductions, 0);
+  const totalNetPay = currentPeriodPayrolls.reduce((sum, p) => sum + p.net_pay, 0);
+  const totalHours = currentPeriodPayrolls.reduce((sum, p) => sum + p.total_hours, 0);
 
   // Get payrolls that can be approved (pending status)
-  const approvablePayrolls = searchFilteredPayrolls.filter(p => p.status === 'pending');
+  const approvablePayrolls = currentPeriodPayrolls.filter(p => p.status === 'pending');
   const selectedApprovablePayrolls = selectedPayrolls.filter(id => 
     approvablePayrolls.some(p => p.id === id)
   );
 
   // Get payrolls that can be paid (approved status)
-  const payablePayrolls = searchFilteredPayrolls.filter(p => p.status === 'approved');
+  const payablePayrolls = currentPeriodPayrolls.filter(p => p.status === 'approved');
   const selectedPayablePayrolls = selectedPayrolls.filter(id => 
     payablePayrolls.some(p => p.id === id)
   );
@@ -174,7 +328,7 @@ export const SalarySheetManager = ({ payrolls: initialPayrolls, profiles, onRefr
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      setSelectedPayrolls(searchFilteredPayrolls.map(p => p.id));
+      setSelectedPayrolls(currentPeriodPayrolls.map(p => p.id));
     } else {
       setSelectedPayrolls([]);
     }
@@ -436,6 +590,11 @@ export const SalarySheetManager = ({ payrolls: initialPayrolls, profiles, onRefr
     setShowPayrollDetails(true);
   };
 
+  const handleEditPayroll = (payroll: Payroll) => {
+    setSelectedPayrollForEdit(payroll);
+    setShowPayrollEdit(true);
+  };
+
   const getSelectedBankName = () => {
     const bank = bankAccounts.find(b => b.id === selectedBankAccount);
     return bank ? `${bank.bank_name} - ${bank.account_number}` : 'Select Bank Account';
@@ -451,54 +610,208 @@ export const SalarySheetManager = ({ payrolls: initialPayrolls, profiles, onRefr
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col md:flex-row gap-4 mb-6">
+          {/* Desktop filters - side by side layout */}
+          <div className="hidden lg:flex flex-wrap items-center gap-4 mb-6">
+            <Select value={dateShortcut} onValueChange={handleDateShortcut}>
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="Period" />
+              </SelectTrigger>
+              <SelectContent>
+                {generateShortcutOptions().map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-gray-500" />
+              <Input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="w-40"
+                placeholder="Start Date"
+              />
+              <span className="text-gray-500">to</span>
+              <Input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="w-40"
+                placeholder="End Date"
+              />
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <Search className="h-4 w-4 text-gray-500" />
+              <Input
+                placeholder="Search employees..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-64"
+              />
+              
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-10 w-10 p-0">
+                    <Filter className="h-4 w-4" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80" align="end">
+                  <div className="space-y-4">
+                    <h4 className="font-medium text-sm">Filters</h4>
+                    
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-xs font-medium text-gray-600 mb-1 block">Status</label>
+                        <Select value={statusFilter} onValueChange={setStatusFilter}>
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="All Status" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All Status</SelectItem>
+                            <SelectItem value="pending">Pending</SelectItem>
+                            <SelectItem value="approved">Approved</SelectItem>
+                            <SelectItem value="paid">Paid</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
+
+          {/* Mobile-optimized filters */}
+          <div className="lg:hidden space-y-3 sm:space-y-4 mb-6">
+            {/* Date filters row */}
+            <div className="flex flex-col space-y-2 sm:space-y-0 sm:flex-row sm:gap-4">
+              <Select value={dateShortcut} onValueChange={handleDateShortcut}>
+                <SelectTrigger className="w-full sm:w-36">
+                  <SelectValue placeholder="Period" />
+                </SelectTrigger>
+                <SelectContent>
+                  {generateShortcutOptions().map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              
+              <div className="flex items-center gap-2 flex-1">
+                <Calendar className="h-4 w-4 text-gray-500 shrink-0" />
+                <Input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="flex-1 text-sm"
+                  placeholder="Start"
+                />
+                <span className="text-gray-500 text-xs shrink-0">to</span>
+                <Input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="flex-1 text-sm"
+                  placeholder="End"
+                />
+              </div>
+            </div>
+            
+            {/* Search and filters row */}
+            <div className="flex flex-col space-y-2 sm:space-y-0 sm:flex-row sm:gap-4">
+              <div className="flex items-center gap-2 flex-1">
+                <Search className="h-4 w-4 text-gray-500 shrink-0" />
+                <Input
+                  placeholder="Search employees..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="flex-1 text-sm"
+                />
+              </div>
+              
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="w-full sm:w-auto text-sm">
+                    <Filter className="h-4 w-4 mr-2" />
+                    <span>Filters</span>
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80" align="end">
+                  <div className="space-y-4">
+                    <h4 className="font-medium text-sm">Filters</h4>
+                    
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-xs font-medium text-gray-600 mb-1 block">Status</label>
+                        <Select value={statusFilter} onValueChange={setStatusFilter}>
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="All Status" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All Status</SelectItem>
+                            <SelectItem value="pending">Pending</SelectItem>
+                            <SelectItem value="approved">Approved</SelectItem>
+                            <SelectItem value="paid">Paid</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
+
+          {/* Mobile-friendly Period Selection */}
+          <div className="flex flex-col sm:flex-row gap-4 mb-6">
             <div className="flex-1">
               <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select pay period" />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.keys(groupedPayrolls).sort().reverse().map((period) => (
+                  {Object.keys(filteredGroupedPayrolls).sort().reverse().map((period) => (
                     <SelectItem key={period} value={period}>
-                      {period} ({groupedPayrolls[period].length} employees)
+                      {period} ({filteredGroupedPayrolls[period].length} employees)
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-            
-            <div className="flex-1">
-              <Input
-                placeholder="Search employees..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
 
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
               <Button 
                 variant="outline" 
-                onClick={() => handlePrintSheet(searchFilteredPayrolls)}
-                disabled={searchFilteredPayrolls.length === 0}
+                onClick={() => handlePrintSheet(currentPeriodPayrolls)}
+                disabled={currentPeriodPayrolls.length === 0}
+                className="w-full sm:w-auto"
               >
                 <Printer className="h-4 w-4 mr-1" />
-                Print
+                <span className="sm:hidden">Print</span>
+                <span className="hidden sm:inline">Print</span>
               </Button>
               <Button 
                 variant="outline" 
-                onClick={() => handleExportCSV(searchFilteredPayrolls)}
-                disabled={searchFilteredPayrolls.length === 0}
+                onClick={() => handleExportCSV(currentPeriodPayrolls)}
+                disabled={currentPeriodPayrolls.length === 0}
+                className="w-full sm:w-auto"
               >
                 <Download className="h-4 w-4 mr-1" />
-                Export
+                <span className="sm:hidden">Export</span>
+                <span className="hidden sm:inline">Export</span>
               </Button>
             </div>
           </div>
 
           {selectedPeriod && (
             <>
-              {/* Summary Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+              {/* Mobile-friendly Summary Cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
                 <Card>
                   <CardContent className="pt-4">
                     <div className="flex items-center justify-between">
@@ -622,74 +935,229 @@ export const SalarySheetManager = ({ payrolls: initialPayrolls, profiles, onRefr
                 </div>
               )}
 
-              {/* Payroll Table */}
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-gray-200">
-                      <th className="text-left py-3 px-4 font-medium text-gray-600">
-                        <Checkbox
-                          checked={selectedPayrolls.length === searchFilteredPayrolls.length && searchFilteredPayrolls.length > 0}
-                          onCheckedChange={handleSelectAll}
-                        />
-                      </th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-600">Employee</th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-600">Hours</th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-600">Rate</th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-600">Gross Pay</th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-600">Deductions</th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-600">Net Pay</th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-600">Status</th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-600">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {searchFilteredPayrolls.map((payroll) => (
-                      <tr key={payroll.id} className="border-b border-gray-100 hover:bg-gray-50">
-                        <td className="py-3 px-4">
+              {/* Mobile-friendly Payroll List */}
+              <>
+                {/* Desktop table view */}
+                <div className="hidden lg:block overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-gray-200">
+                        <th className="text-left py-3 px-4 font-medium text-gray-600">
                           <Checkbox
-                            checked={selectedPayrolls.includes(payroll.id)}
-                            onCheckedChange={(checked) => handleSelectPayroll(payroll.id, checked as boolean)}
+                            checked={selectedPayrolls.length === currentPeriodPayrolls.length && currentPeriodPayrolls.length > 0}
+                            onCheckedChange={handleSelectAll}
                           />
-                        </td>
-                        <td className="py-3 px-4">
-                          <div>
-                            <div className="font-medium">{payroll.profiles?.full_name || 'N/A'}</div>
-                            <div className="text-sm text-gray-600">{payroll.profiles?.role || 'N/A'}</div>
+                        </th>
+                        <th className="text-left py-3 px-4 font-medium text-gray-600">Employee</th>
+                        <th className="text-left py-3 px-4 font-medium text-gray-600">Hours</th>
+                        <th className="text-left py-3 px-4 font-medium text-gray-600">Rate</th>
+                        <th className="text-left py-3 px-4 font-medium text-gray-600">Gross Pay</th>
+                        <th className="text-left py-3 px-4 font-medium text-gray-600">Net Pay</th>
+                        <th className="text-left py-3 px-4 font-medium text-gray-600">Status</th>
+                        <th className="text-left py-3 px-4 font-medium text-gray-600">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {currentPeriodPayrolls.map((payroll) => (
+                        <tr key={payroll.id} className="border-b border-gray-100 hover:bg-gray-50">
+                          <td className="py-3 px-4">
+                            <Checkbox
+                              checked={selectedPayrolls.includes(payroll.id)}
+                              onCheckedChange={(checked) => handleSelectPayroll(payroll.id, checked as boolean)}
+                            />
+                          </td>
+                          <td className="py-3 px-4">
+                            <div>
+                              <div className="font-medium">{payroll.profiles?.full_name || 'N/A'}</div>
+                              <div className="text-sm text-gray-600">{payroll.profiles?.role || 'N/A'}</div>
+                            </div>
+                          </td>
+                          <td className="py-3 px-4">{payroll.total_hours.toFixed(1)}</td>
+                          <td className="py-3 px-4">${payroll.hourly_rate.toFixed(2)}</td>
+                          <td className="py-3 px-4">${payroll.gross_pay.toFixed(2)}</td>
+                          <td className="py-3 px-4 font-bold text-green-600">${payroll.net_pay.toFixed(2)}</td>
+                          <td className="py-3 px-4">
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              payroll.status === 'paid' ? 'bg-green-100 text-green-800' :
+                              payroll.status === 'approved' ? 'bg-blue-100 text-blue-800' :
+                              'bg-yellow-100 text-yellow-800'
+                            }`}>
+                              {payroll.status}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="flex gap-1">
+                              {payroll.status === 'pending' && (
+                                <>
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline"
+                                    onClick={() => updatePayrollStatus(payroll.id, 'approved')}
+                                  >
+                                    Approve
+                                  </Button>
+                                  <ActionDropdown
+                                    items={[
+                                      {
+                                        label: "Edit",
+                                        onClick: () => handleEditPayroll(payroll),
+                                        icon: <Edit className="h-4 w-4" />
+                                      },
+                                      {
+                                        label: "Delete",
+                                        onClick: () => deletePayroll(payroll.id),
+                                        icon: <Trash2 className="h-4 w-4" />,
+                                        destructive: true
+                                      },
+                                      {
+                                        label: "View Details",
+                                        onClick: () => handleViewPayroll(payroll),
+                                        icon: <Eye className="h-4 w-4" />
+                                      }
+                                    ]}
+                                  />
+                                </>
+                              )}
+                              {payroll.status === 'approved' && (
+                                <>
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline"
+                                    onClick={() => updatePayrollStatus(payroll.id, 'paid', selectedBankAccount)}
+                                    disabled={!selectedBankAccount}
+                                  >
+                                    Mark as Paid
+                                  </Button>
+                                  <ActionDropdown
+                                    items={[
+                                      {
+                                        label: "Edit",
+                                        onClick: () => handleEditPayroll(payroll),
+                                        icon: <Edit className="h-4 w-4" />
+                                      },
+                                      {
+                                        label: "Delete",
+                                        onClick: () => deletePayroll(payroll.id),
+                                        icon: <Trash2 className="h-4 w-4" />,
+                                        destructive: true
+                                      },
+                                      {
+                                        label: "View Details",
+                                        onClick: () => handleViewPayroll(payroll),
+                                        icon: <Eye className="h-4 w-4" />
+                                      }
+                                    ]}
+                                  />
+                                </>
+                              )}
+                              {payroll.status === 'paid' && (
+                                <ActionDropdown
+                                  items={[
+                                    {
+                                      label: "View Details",
+                                      onClick: () => handleViewPayroll(payroll),
+                                      icon: <Eye className="h-4 w-4" />
+                                    }
+                                  ]}
+                                />
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Mobile card view */}
+                <div className="lg:hidden space-y-4">
+                  {/* Select all checkbox for mobile */}
+                  <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
+                    <Checkbox
+                      checked={selectedPayrolls.length === currentPeriodPayrolls.length && currentPeriodPayrolls.length > 0}
+                      onCheckedChange={handleSelectAll}
+                    />
+                    <span className="text-sm font-medium text-gray-700">
+                      Select All ({currentPeriodPayrolls.length} employees)
+                    </span>
+                  </div>
+
+                  {currentPeriodPayrolls.map((payroll) => (
+                    <Card key={payroll.id} className="border-l-4 border-l-green-500">
+                      <CardContent className="p-4">
+                        <div className="space-y-3">
+                          {/* Header with checkbox, employee info and status */}
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-start gap-3 flex-1 min-w-0">
+                              <Checkbox
+                                checked={selectedPayrolls.includes(payroll.id)}
+                                onCheckedChange={(checked) => handleSelectPayroll(payroll.id, checked as boolean)}
+                                className="mt-1"
+                              />
+                              <div className="flex-1 min-w-0">
+                                <h4 className="font-semibold text-base text-gray-900 truncate">
+                                  {payroll.profiles?.full_name || 'N/A'}
+                                </h4>
+                                <p className="text-sm text-gray-600 truncate">
+                                  {payroll.profiles?.role || 'N/A'}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="shrink-0">
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                payroll.status === 'paid' ? 'bg-green-100 text-green-800' :
+                                payroll.status === 'approved' ? 'bg-blue-100 text-blue-800' :
+                                'bg-yellow-100 text-yellow-800'
+                              }`}>
+                                {payroll.status}
+                              </span>
+                            </div>
                           </div>
-                        </td>
-                        <td className="py-3 px-4">{payroll.total_hours.toFixed(1)}</td>
-                        <td className="py-3 px-4">${payroll.hourly_rate.toFixed(2)}</td>
-                        <td className="py-3 px-4">${payroll.gross_pay.toFixed(2)}</td>
-                        <td className="py-3 px-4 text-red-600">${payroll.deductions.toFixed(2)}</td>
-                        <td className="py-3 px-4 font-bold text-green-600">${payroll.net_pay.toFixed(2)}</td>
-                        <td className="py-3 px-4">
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            payroll.status === 'paid' ? 'bg-green-100 text-green-800' :
-                            payroll.status === 'approved' ? 'bg-blue-100 text-blue-800' :
-                            'bg-yellow-100 text-yellow-800'
-                          }`}>
-                            {payroll.status}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4">
-                          <div className="flex gap-1">
+
+                          {/* Financial details grid */}
+                          <div className="grid grid-cols-4 gap-3 pt-2 border-t border-gray-100">
+                            <div className="text-center p-2 bg-blue-50 rounded">
+                              <div className="text-xs text-blue-600 font-medium">Hours</div>
+                              <div className="font-semibold text-blue-700">{payroll.total_hours.toFixed(1)}</div>
+                            </div>
+                            <div className="text-center p-2 bg-purple-50 rounded">
+                              <div className="text-xs text-purple-600 font-medium">Rate</div>
+                              <div className="font-semibold text-purple-700">${payroll.hourly_rate.toFixed(2)}</div>
+                            </div>
+                            <div className="text-center p-2 bg-orange-50 rounded">
+                              <div className="text-xs text-orange-600 font-medium">Gross</div>
+                              <div className="font-semibold text-orange-700">${payroll.gross_pay.toFixed(2)}</div>
+                            </div>
+                            <div className="text-center p-2 bg-green-50 rounded">
+                              <div className="text-xs text-green-600 font-medium">Net Pay</div>
+                              <div className="font-semibold text-green-700">${payroll.net_pay.toFixed(2)}</div>
+                            </div>
+                          </div>
+
+                          {/* Action buttons */}
+                          <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
                             {payroll.status === 'pending' && (
                               <>
                                 <Button 
                                   size="sm" 
                                   variant="outline"
                                   onClick={() => updatePayrollStatus(payroll.id, 'approved')}
+                                  className="flex-1"
                                 >
-                                  Mark as Approved
+                                  Approve
                                 </Button>
                                 <ActionDropdown
                                   items={[
                                     {
+                                      label: "Edit",
+                                      onClick: () => handleEditPayroll(payroll),
+                                      icon: <Edit className="h-4 w-4" />
+                                    },
+                                    {
                                       label: "Delete",
                                       onClick: () => deletePayroll(payroll.id),
                                       icon: <Trash2 className="h-4 w-4" />,
-                                      variant: "destructive"
+                                      destructive: true
                                     },
                                     {
                                       label: "View Details",
@@ -704,19 +1172,24 @@ export const SalarySheetManager = ({ payrolls: initialPayrolls, profiles, onRefr
                               <>
                                 <Button 
                                   size="sm" 
-                                  variant="outline"
                                   onClick={() => updatePayrollStatus(payroll.id, 'paid', selectedBankAccount)}
                                   disabled={!selectedBankAccount}
+                                  className="flex-1"
                                 >
                                   Mark as Paid
                                 </Button>
                                 <ActionDropdown
                                   items={[
                                     {
+                                      label: "Edit",
+                                      onClick: () => handleEditPayroll(payroll),
+                                      icon: <Edit className="h-4 w-4" />
+                                    },
+                                    {
                                       label: "Delete",
                                       onClick: () => deletePayroll(payroll.id),
                                       icon: <Trash2 className="h-4 w-4" />,
-                                      variant: "destructive"
+                                      destructive: true
                                     },
                                     {
                                       label: "View Details",
@@ -739,12 +1212,19 @@ export const SalarySheetManager = ({ payrolls: initialPayrolls, profiles, onRefr
                               />
                             )}
                           </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+
+                  {currentPeriodPayrolls.length === 0 && (
+                    <div className="text-center py-8 text-gray-500">
+                      <div className="text-lg font-medium mb-2">No payroll records found</div>
+                      <p className="text-sm">Try adjusting your filters or date range</p>
+                    </div>
+                  )}
+                </div>
+              </>
             </>
           )}
         </CardContent>
@@ -767,6 +1247,17 @@ export const SalarySheetManager = ({ payrolls: initialPayrolls, profiles, onRefr
         payroll={selectedPayrollForView}
         isOpen={showPayrollDetails}
         onClose={() => setShowPayrollDetails(false)}
+      />
+
+      {/* Payroll Edit Dialog */}
+      <PayrollEditDialog
+        payroll={selectedPayrollForEdit}
+        isOpen={showPayrollEdit}
+        onClose={() => setShowPayrollEdit(false)}
+        onSuccess={() => {
+          onRefresh();
+          setShowPayrollEdit(false);
+        }}
       />
     </div>
   );

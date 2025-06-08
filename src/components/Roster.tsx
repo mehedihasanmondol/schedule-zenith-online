@@ -360,141 +360,152 @@ export const RosterComponent = () => {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 sm:space-y-6 p-2 sm:p-4 lg:p-6">
+      {/* Mobile-friendly header */}
+      <div className="flex flex-col space-y-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
         <div className="flex items-center gap-3">
-          <Calendar className="h-8 w-8 text-blue-600" />
+          <Calendar className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600" />
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Enhanced Roster Management</h1>
-            <p className="text-gray-600">Schedule and manage team assignments with advanced features</p>
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">Enhanced Roster Management</h1>
+            <p className="text-sm sm:text-base text-gray-600">Schedule and manage team assignments with advanced features</p>
           </div>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="flex items-center gap-2">
+            <Button className="flex items-center gap-2 w-full sm:w-auto">
               <Plus className="h-4 w-4" />
-              Create Roster
+              <span className="sm:inline">Create Roster</span>
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-sm sm:max-w-md lg:max-w-3xl max-h-[90vh] overflow-y-auto mx-2 sm:mx-auto">
             <DialogHeader>
-              <DialogTitle>Create Enhanced Roster</DialogTitle>
+              <DialogTitle className="text-lg sm:text-xl">Create Enhanced Roster</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <Label htmlFor="name">Roster Name</Label>
+                <Label htmlFor="name" className="text-sm font-medium">Roster Name</Label>
                 <Input
                   id="name"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="Auto-generated if left empty"
+                  className="mt-1"
                 />
-                <p className="text-sm text-gray-500 mt-1">
+                <p className="text-xs text-gray-500 mt-1">
                   Default: {generateDefaultRosterName()}
                 </p>
               </div>
 
-              <MultipleProfileSelector
-                profiles={profiles}
-                selectedProfileIds={formData.profile_ids}
-                onProfileSelect={(profileIds) => setFormData({ ...formData, profile_ids: profileIds })}
-                label="Select Team Members"
-                placeholder="Choose team members"
-                showRoleFilter={true}
-                className="border rounded-lg p-3 bg-gray-50"
-              />
+              <div className="space-y-3">
+                <MultipleProfileSelector
+                  profiles={profiles}
+                  selectedProfileIds={formData.profile_ids}
+                  onProfileSelect={(profileIds) => setFormData({ ...formData, profile_ids: profileIds })}
+                  label="Select Team Members"
+                  placeholder="Choose team members"
+                  showRoleFilter={true}
+                  className="border rounded-lg p-3 bg-gray-50"
+                />
+              </div>
               
-              <div>
-                <Label htmlFor="client_id">Client</Label>
-                <Select value={formData.client_id} onValueChange={(value) => setFormData({ ...formData, client_id: value })}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select client" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {clients.map((client) => (
-                      <SelectItem key={client.id} value={client.id}>
-                        {client.company}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label htmlFor="project_id">Project</Label>
-                <Select value={formData.project_id} onValueChange={(value) => setFormData({ ...formData, project_id: value })}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select project" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {projects.filter(p => !formData.client_id || p.client_id === formData.client_id).map((project) => (
-                      <SelectItem key={project.id} value={project.id}>
-                        {project.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="date">Start Date</Label>
+                  <Label htmlFor="client_id" className="text-sm font-medium">Client</Label>
+                  <Select value={formData.client_id} onValueChange={(value) => setFormData({ ...formData, client_id: value })}>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Select client" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {clients.map((client) => (
+                        <SelectItem key={client.id} value={client.id}>
+                          {client.company}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="project_id" className="text-sm font-medium">Project</Label>
+                  <Select value={formData.project_id} onValueChange={(value) => setFormData({ ...formData, project_id: value })}>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Select project" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {projects.filter(p => !formData.client_id || p.client_id === formData.client_id).map((project) => (
+                        <SelectItem key={project.id} value={project.id}>
+                          {project.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="date" className="text-sm font-medium">Start Date</Label>
                   <Input
                     id="date"
                     type="date"
                     value={formData.date}
                     onChange={(e) => setFormData({ ...formData, date: e.target.value })}
                     required
+                    className="mt-1"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="end_date">End Date (Optional)</Label>
+                  <Label htmlFor="end_date" className="text-sm font-medium">End Date (Optional)</Label>
                   <Input
                     id="end_date"
                     type="date"
                     value={formData.end_date}
                     onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
                     min={formData.date}
+                    className="mt-1"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="start_time">Start Time</Label>
+                  <Label htmlFor="start_time" className="text-sm font-medium">Start Time</Label>
                   <Input
                     id="start_time"
                     type="time"
                     value={formData.start_time}
                     onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
                     required
+                    className="mt-1"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="end_time">End Time</Label>
+                  <Label htmlFor="end_time" className="text-sm font-medium">End Time</Label>
                   <Input
                     id="end_time"
                     type="time"
                     value={formData.end_time}
                     onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
                     required
+                    className="mt-1"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="expected_profiles">Expected Team Members</Label>
+                  <Label htmlFor="expected_profiles" className="text-sm font-medium">Expected Team Members</Label>
                   <Input
                     id="expected_profiles"
                     type="number"
                     min="1"
                     value={formData.expected_profiles}
                     onChange={(e) => setFormData({ ...formData, expected_profiles: parseInt(e.target.value) || 1 })}
+                    className="mt-1"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="per_hour_rate">Hourly Rate (Optional)</Label>
+                  <Label htmlFor="per_hour_rate" className="text-sm font-medium">Hourly Rate (Optional)</Label>
                   <Input
                     id="per_hour_rate"
                     type="number"
@@ -502,17 +513,19 @@ export const RosterComponent = () => {
                     min="0"
                     value={formData.per_hour_rate}
                     onChange={(e) => setFormData({ ...formData, per_hour_rate: parseFloat(e.target.value) || 0 })}
+                    className="mt-1"
                   />
                 </div>
               </div>
 
               <div>
-                <Label htmlFor="notes">Notes</Label>
+                <Label htmlFor="notes" className="text-sm font-medium">Notes</Label>
                 <Textarea
                   id="notes"
                   value={formData.notes}
                   onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                   placeholder="Additional notes for this roster..."
+                  className="mt-1 min-h-[80px]"
                 />
               </div>
 
@@ -524,52 +537,52 @@ export const RosterComponent = () => {
         </Dialog>
       </div>
 
-      {/* Enhanced Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Total Rosters</CardTitle>
-            <Calendar className="h-4 w-4 text-blue-600" />
+      {/* Mobile-friendly stats cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
+        <Card className="p-3 sm:p-4">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-0">
+            <CardTitle className="text-xs sm:text-sm font-medium text-gray-600">Total Rosters</CardTitle>
+            <Calendar className="h-3 w-3 sm:h-4 sm:w-4 text-blue-600" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600">{filteredRosters.length}</div>
+          <CardContent className="p-0 pt-2">
+            <div className="text-lg sm:text-xl lg:text-2xl font-bold text-blue-600">{filteredRosters.length}</div>
             <p className="text-xs text-muted-foreground">All scheduled rosters</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Confirmed</CardTitle>
-            <Users className="h-4 w-4 text-green-600" />
+        <Card className="p-3 sm:p-4">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-0">
+            <CardTitle className="text-xs sm:text-sm font-medium text-gray-600">Confirmed</CardTitle>
+            <Users className="h-3 w-3 sm:h-4 sm:w-4 text-green-600" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">
+          <CardContent className="p-0 pt-2">
+            <div className="text-lg sm:text-xl lg:text-2xl font-bold text-green-600">
               {filteredRosters.filter(r => r.status === 'confirmed').length}
             </div>
             <p className="text-xs text-muted-foreground">Ready to work</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Total Hours</CardTitle>
-            <Clock className="h-4 w-4 text-purple-600" />
+        <Card className="p-3 sm:p-4">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-0">
+            <CardTitle className="text-xs sm:text-sm font-medium text-gray-600">Total Hours</CardTitle>
+            <Clock className="h-3 w-3 sm:h-4 sm:w-4 text-purple-600" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-purple-600">
+          <CardContent className="p-0 pt-2">
+            <div className="text-lg sm:text-xl lg:text-2xl font-bold text-purple-600">
               {filteredRosters.reduce((sum, r) => sum + r.total_hours, 0).toFixed(1)}
             </div>
             <p className="text-xs text-muted-foreground">Scheduled hours</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Expected Value</CardTitle>
-            <DollarSign className="h-4 w-4 text-orange-600" />
+        <Card className="p-3 sm:p-4">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-0">
+            <CardTitle className="text-xs sm:text-sm font-medium text-gray-600">Expected Value</CardTitle>
+            <DollarSign className="h-3 w-3 sm:h-4 sm:w-4 text-orange-600" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-orange-600">
+          <CardContent className="p-0 pt-2">
+            <div className="text-lg sm:text-xl lg:text-2xl font-bold text-orange-600">
               ${filteredRosters.reduce((sum, r) => sum + (r.total_hours * (r.per_hour_rate || 0)), 0).toFixed(2)}
             </div>
             <p className="text-xs text-muted-foreground">Estimated revenue</p>
@@ -578,10 +591,10 @@ export const RosterComponent = () => {
       </div>
 
       <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>Roster Views</CardTitle>
-            <div className="relative w-64">
+        <CardHeader className="p-4 sm:p-6">
+          <div className="flex flex-col space-y-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
+            <CardTitle className="text-lg sm:text-xl">Roster Views</CardTitle>
+            <div className="relative w-full sm:w-64">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
               <Input
                 placeholder="Search by name or project..."
@@ -592,14 +605,14 @@ export const RosterComponent = () => {
             </div>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-4 sm:p-6 pt-0">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="calendar">Calendar View</TabsTrigger>
-              <TabsTrigger value="list">List View</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-2 mb-4 sm:mb-6">
+              <TabsTrigger value="calendar" className="text-sm">Calendar View</TabsTrigger>
+              <TabsTrigger value="list" className="text-sm">List View</TabsTrigger>
             </TabsList>
             
-            <TabsContent value="calendar" className="mt-6">
+            <TabsContent value="calendar" className="mt-4 sm:mt-6">
               <EnhancedRosterCalendarView 
                 rosters={calendarRosters} 
                 onEdit={handleEditRoster}
@@ -608,81 +621,151 @@ export const RosterComponent = () => {
               />
             </TabsContent>
             
-            <TabsContent value="list" className="mt-4">
+            <TabsContent value="list" className="mt-4 sm:mt-6 space-y-4">
               <RosterWeeklyFilter 
                 currentWeek={currentWeek}
                 onWeekChange={setCurrentWeek}
               />
               
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-gray-200">
-                      <th className="text-left py-3 px-4 font-medium text-gray-600">Roster Name</th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-600">Team Members</th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-600">Project</th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-600">Date Range</th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-600">Time</th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-600">Status</th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-600">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {weekFilteredRosters.map((roster) => (
-                      <tr key={roster.id} className="border-b border-gray-100 hover:bg-gray-50">
-                        <td className="py-3 px-4">
-                          <div className="font-medium text-gray-900">{roster.name || 'Unnamed Roster'}</div>
-                        </td>
-                        <td className="py-3 px-4">
-                          <div className="flex flex-wrap gap-1">
-                            {roster.roster_profiles?.map((rp) => (
-                              <Badge key={rp.id} variant="secondary" className="text-xs">
-                                {rp.profiles?.full_name}
-                              </Badge>
-                            )) || <span className="text-gray-500">No profiles assigned</span>}
+              {/* Mobile-friendly table */}
+              <div className="space-y-4 sm:space-y-0">
+                {/* Mobile cards for smaller screens */}
+                <div className="block sm:hidden space-y-4">
+                  {weekFilteredRosters.map((roster) => (
+                    <Card key={roster.id} className="p-4">
+                      <div className="space-y-3">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-medium text-gray-900 truncate">
+                              {roster.name || 'Unnamed Roster'}
+                            </h3>
+                            <div className="mt-1">
+                              <div className="text-sm text-gray-600">
+                                {roster.projects?.name || 'N/A'}
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                {roster.clients?.company || 'N/A'}
+                              </div>
+                            </div>
                           </div>
-                        </td>
-                        <td className="py-3 px-4">
-                          <div>
-                            <div className="font-medium text-gray-900">{roster.projects?.name || 'N/A'}</div>
-                            <div className="text-sm text-gray-600">{roster.clients?.company || 'N/A'}</div>
+                          <div className="flex items-center gap-2 ml-2">
+                            <Badge variant={
+                              roster.status === "confirmed" ? "default" : 
+                              roster.status === "pending" ? "secondary" : "outline"
+                            } className="text-xs">
+                              {roster.status}
+                            </Badge>
+                            <RosterActions
+                              roster={roster}
+                              onEdit={handleEditRoster}
+                              onDelete={deleteRoster}
+                              onView={handleViewRoster}
+                            />
                           </div>
-                        </td>
-                        <td className="py-3 px-4 text-gray-600">
-                          <div className="text-sm">
+                        </div>
+                        
+                        <div className="flex flex-wrap gap-1">
+                          {roster.roster_profiles?.map((rp) => (
+                            <Badge key={rp.id} variant="secondary" className="text-xs">
+                              {rp.profiles?.full_name}
+                            </Badge>
+                          )) || <span className="text-xs text-gray-500">No profiles assigned</span>}
+                        </div>
+                        
+                        <div className="flex items-center justify-between text-xs text-gray-600">
+                          <span>
                             {new Date(roster.date).toLocaleDateString()}
                             {roster.end_date && roster.end_date !== roster.date && (
-                              <div className="text-xs text-gray-500">
-                                to {new Date(roster.end_date).toLocaleDateString()}
-                              </div>
+                              <span className="text-gray-500">
+                                {' '}to {new Date(roster.end_date).toLocaleDateString()}
+                              </span>
                             )}
-                          </div>
-                        </td>
-                        <td className="py-3 px-4 text-gray-600">
-                          <div className="text-sm">
-                            {roster.start_time} - {roster.end_time}
-                          </div>
-                        </td>
-                        <td className="py-3 px-4">
-                          <Badge variant={
-                            roster.status === "confirmed" ? "default" : 
-                            roster.status === "pending" ? "secondary" : "outline"
-                          }>
-                            {roster.status}
-                          </Badge>
-                        </td>
-                        <td className="py-3 px-4">
-                          <RosterActions
-                            roster={roster}
-                            onEdit={handleEditRoster}
-                            onDelete={deleteRoster}
-                            onView={handleViewRoster}
-                          />
-                        </td>
+                          </span>
+                          <span>{roster.start_time} - {roster.end_time}</span>
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+
+                {/* Desktop table for larger screens */}
+                <div className="hidden sm:block overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-gray-200">
+                        <th className="text-left py-3 px-4 font-medium text-gray-600">Roster Name</th>
+                        <th className="text-left py-3 px-4 font-medium text-gray-600">Team Members</th>
+                        <th className="text-left py-3 px-4 font-medium text-gray-600">Project</th>
+                        <th className="text-left py-3 px-4 font-medium text-gray-600">Date Range</th>
+                        <th className="text-left py-3 px-4 font-medium text-gray-600">Time</th>
+                        <th className="text-left py-3 px-4 font-medium text-gray-600">Status</th>
+                        <th className="text-left py-3 px-4 font-medium text-gray-600">Actions</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {weekFilteredRosters.map((roster) => (
+                        <tr key={roster.id} className="border-b border-gray-100 hover:bg-gray-50">
+                          <td className="py-3 px-4">
+                            <div className="font-medium text-gray-900">{roster.name || 'Unnamed Roster'}</div>
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="flex flex-wrap gap-1">
+                              {roster.roster_profiles?.map((rp) => (
+                                <Badge key={rp.id} variant="secondary" className="text-xs">
+                                  {rp.profiles?.full_name}
+                                </Badge>
+                              )) || <span className="text-gray-500">No profiles assigned</span>}
+                            </div>
+                          </td>
+                          <td className="py-3 px-4">
+                            <div>
+                              <div className="font-medium text-gray-900">{roster.projects?.name || 'N/A'}</div>
+                              <div className="text-sm text-gray-600">{roster.clients?.company || 'N/A'}</div>
+                            </div>
+                          </td>
+                          <td className="py-3 px-4 text-gray-600">
+                            <div className="text-sm">
+                              {new Date(roster.date).toLocaleDateString()}
+                              {roster.end_date && roster.end_date !== roster.date && (
+                                <div className="text-xs text-gray-500">
+                                  to {new Date(roster.end_date).toLocaleDateString()}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-3 px-4 text-gray-600">
+                            <div className="text-sm">
+                              {roster.start_time} - {roster.end_time}
+                            </div>
+                          </td>
+                          <td className="py-3 px-4">
+                            <Badge variant={
+                              roster.status === "confirmed" ? "default" : 
+                              roster.status === "pending" ? "secondary" : "outline"
+                            }>
+                              {roster.status}
+                            </Badge>
+                          </td>
+                          <td className="py-3 px-4">
+                            <RosterActions
+                              roster={roster}
+                              onEdit={handleEditRoster}
+                              onDelete={deleteRoster}
+                              onView={handleViewRoster}
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {weekFilteredRosters.length === 0 && (
+                  <div className="text-center py-8 text-gray-500">
+                    <CalendarDays className="h-8 w-8 mx-auto mb-2 text-gray-300" />
+                    <p className="text-sm">No rosters found for this week</p>
+                  </div>
+                )}
               </div>
             </TabsContent>
           </Tabs>

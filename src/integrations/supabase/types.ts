@@ -481,6 +481,42 @@ export type Database = {
           },
         ]
       }
+      payroll_working_hours: {
+        Row: {
+          created_at: string
+          id: string
+          payroll_id: string
+          working_hours_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          payroll_id: string
+          working_hours_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          payroll_id?: string
+          working_hours_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_working_hours_payroll_id_fkey"
+            columns: ["payroll_id"]
+            isOneToOne: false
+            referencedRelation: "payroll"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_working_hours_working_hours_id_fkey"
+            columns: ["working_hours_id"]
+            isOneToOne: true
+            referencedRelation: "working_hours"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null

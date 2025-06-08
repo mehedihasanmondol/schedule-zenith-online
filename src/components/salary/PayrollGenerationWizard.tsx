@@ -295,27 +295,32 @@ export const PayrollGenerationWizard = ({ profiles, workingHours, onRefresh }: P
   const totalGrossPay = payrollPreview.reduce((sum, p) => sum + p.grossPay, 0);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6 p-2 sm:p-4">
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calculator className="h-5 w-5" />
-            Payroll Generation Wizard - Step {step} of 2
+        <CardHeader className="pb-4">
+          <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+            <Calculator className="h-5 w-5 sm:h-6 sm:w-6" />
+            <span className="hidden sm:inline">Payroll Generation Wizard - Step {step} of 2</span>
+            <span className="sm:hidden">Payroll - Step {step}/2</span>
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4 sm:space-y-6">
           {step === 1 && (
-            <div className="space-y-6">
+            <div className="space-y-4 sm:space-y-6">
               <div>
-                <h3 className="text-lg font-semibold mb-4">Step 1: Select Profiles & Configure Pay Period</h3>
+                <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">
+                  <span className="hidden sm:inline">Step 1: Select Profiles & Configure Pay Period</span>
+                  <span className="sm:hidden">Select Profiles & Period</span>
+                </h3>
                 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="space-y-4 lg:space-y-0 lg:grid lg:grid-cols-3 lg:gap-6">
                   <div className="lg:col-span-2">
-                    <div className="mb-4">
-                      <div className="flex items-center gap-2 text-sm text-blue-600 mb-2">
-                        <Calculator className="h-4 w-4" />
-                        Showing employees with approved working hours for selected period
-                        {filterLoading && <RefreshCw className="h-4 w-4 animate-spin" />}
+                    <div className="mb-3 sm:mb-4">
+                      <div className="flex items-center gap-2 text-xs sm:text-sm text-blue-600 mb-2">
+                        <Calculator className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
+                        <span className="hidden sm:inline">Showing employees with approved working hours for selected period</span>
+                        <span className="sm:hidden">Approved hours only</span>
+                        {filterLoading && <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4 animate-spin shrink-0" />}
                       </div>
                     </div>
                     <EnhancedProfileSelector
@@ -329,103 +334,114 @@ export const PayrollGenerationWizard = ({ profiles, workingHours, onRefresh }: P
                     />
                   </div>
                   
-                  <div className="space-y-4">
-                    <div className="bg-gray-50 p-4 rounded-lg space-y-4">
-                      <h4 className="font-medium text-gray-700">Pay Period Settings</h4>
+                  <div className="space-y-3 sm:space-y-4">
+                    <div className="bg-gray-50 p-3 sm:p-4 rounded-lg space-y-3 sm:space-y-4">
+                      <h4 className="font-medium text-gray-700 text-sm sm:text-base">Pay Period Settings</h4>
                       
-                      <div>
-                        <Label>Pay Period Start</Label>
-                        <Input
-                          type="date"
-                          value={dateRange.start}
-                          onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
-                        />
-                      </div>
-                      
-                      <div>
-                        <Label>Pay Period End</Label>
-                        <Input
-                          type="date"
-                          value={dateRange.end}
-                          onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
-                        />
+                      <div className="space-y-3">
+                        <div>
+                          <Label className="text-xs sm:text-sm">Pay Period Start</Label>
+                          <Input
+                            type="date"
+                            value={dateRange.start}
+                            onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
+                            className="text-sm"
+                          />
+                        </div>
+                        
+                        <div>
+                          <Label className="text-xs sm:text-sm">Pay Period End</Label>
+                          <Input
+                            type="date"
+                            value={dateRange.end}
+                            onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
+                            className="text-sm"
+                          />
+                        </div>
                       </div>
                     </div>
 
                     <Button 
                       onClick={reloadFilteredData} 
                       variant="outline" 
-                      className="w-full"
+                      className="w-full text-xs sm:text-sm"
                       disabled={filterLoading}
+                      size="sm"
                     >
                       {filterLoading ? (
                         <>
-                          <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                          Refreshing...
+                          <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 animate-spin" />
+                          <span className="hidden sm:inline">Refreshing...</span>
+                          <span className="sm:hidden">Loading...</span>
                         </>
                       ) : (
                         <>
-                          <RefreshCw className="h-4 w-4 mr-2" />
-                          Refresh Data
+                          <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                          <span className="hidden sm:inline">Refresh Data</span>
+                          <span className="sm:hidden">Refresh</span>
                         </>
                       )}
                     </Button>
                   </div>
                 </div>
 
-                <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                    <div>
-                      <div className="text-gray-600">Eligible Profiles</div>
+                {/* Mobile-friendly stats grid */}
+                <div className="mt-4 p-3 sm:p-4 bg-gray-50 rounded-lg">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 text-xs sm:text-sm">
+                    <div className="text-center sm:text-left">
+                      <div className="text-gray-600 mb-1">Eligible</div>
                       <div className="font-bold text-blue-600">{filteredProfiles.length}</div>
                     </div>
-                    <div>
-                      <div className="text-gray-600">Approved Hours</div>
+                    <div className="text-center sm:text-left">
+                      <div className="text-gray-600 mb-1">Hours</div>
                       <div className="font-bold text-green-600">
                         {filteredWorkingHours.reduce((sum, wh) => sum + wh.total_hours, 0).toFixed(1)}
                       </div>
                     </div>
-                    <div>
-                      <div className="text-gray-600">Date Range</div>
-                      <div className="font-bold">{dateRange.start} to {dateRange.end}</div>
+                    <div className="text-center sm:text-left col-span-2 sm:col-span-1">
+                      <div className="text-gray-600 mb-1">Period</div>
+                      <div className="font-bold text-xs">{dateRange.start} to {dateRange.end}</div>
                     </div>
-                    <div>
-                      <div className="text-gray-600">Status</div>
-                      <div className="font-bold text-green-600">Approved Only</div>
+                    <div className="text-center sm:text-left col-span-2 sm:col-span-1">
+                      <div className="text-gray-600 mb-1">Status</div>
+                      <div className="font-bold text-green-600">Approved</div>
                     </div>
                   </div>
                 </div>
 
                 {overlappingPayrolls.length > 0 && (
-                  <div className="mt-4 p-4 border border-orange-200 bg-orange-50 rounded-lg">
+                  <div className="mt-4 p-3 sm:p-4 border border-orange-200 bg-orange-50 rounded-lg">
                     <div className="flex items-center gap-2 text-orange-800 mb-2">
-                      <AlertTriangle className="h-4 w-4" />
-                      <span className="font-medium">Overlapping Payroll Periods Detected</span>
+                      <AlertTriangle className="h-4 w-4 shrink-0" />
+                      <span className="font-medium text-sm sm:text-base">Overlapping Payroll Detected</span>
                     </div>
-                    <p className="text-sm text-orange-700">
-                      The following employees already have payroll records for overlapping periods:
+                    <p className="text-xs sm:text-sm text-orange-700 mb-2">
+                      Employees with overlapping periods:
                     </p>
-                    <ul className="text-sm text-orange-700 mt-1">
+                    <ul className="text-xs sm:text-sm text-orange-700 mb-2 space-y-1">
                       {overlappingPayrolls.map(profileId => {
                         const profile = filteredProfiles.find(p => p.id === profileId);
                         return <li key={profileId}>• {profile?.full_name}</li>;
                       })}
                     </ul>
-                    <p className="text-sm text-orange-700 mt-2 font-medium">
-                      You can still proceed, but this may create duplicate payroll records.
+                    <p className="text-xs sm:text-sm text-orange-700 font-medium">
+                      You can proceed but this may create duplicates.
                     </p>
                   </div>
                 )}
               </div>
 
-              <div className="flex justify-end">
+              <div className="flex justify-end pt-4 border-t">
                 <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
                   <AlertDialogTrigger asChild>
                     <Button 
                       onClick={handleNextStep}
                       disabled={selectedProfileIds.length === 0 || !dateRange.start || !dateRange.end || payrollPreview.length === 0}
+                      className="w-full sm:w-auto text-sm"
+                      size="sm"
                     >
-                      Next: Review Payroll ({payrollPreview.length} employees)
+                      <span className="hidden sm:inline">Next: Review Payroll ({payrollPreview.length} employees)</span>
+                      <span className="sm:hidden">Review ({payrollPreview.length})</span>
                     </Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
@@ -464,42 +480,45 @@ export const PayrollGenerationWizard = ({ profiles, workingHours, onRefresh }: P
           )}
 
           {step === 2 && (
-            <div className="space-y-6">
+            <div className="space-y-4 sm:space-y-6">
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold">Step 2: Review Payroll Calculations</h3>
+                <h3 className="text-base sm:text-lg font-semibold">
+                  <span className="hidden sm:inline">Step 2: Review Payroll Calculations</span>
+                  <span className="sm:hidden">Review Calculations</span>
+                </h3>
               </div>
 
-              {/* Summary Statistics */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              {/* Mobile-friendly Summary Statistics */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
                 <Card>
-                  <CardContent className="pt-6">
+                  <CardContent className="pt-4 sm:pt-6">
                     <div className="text-center">
-                      <div className="text-2xl font-bold text-blue-600">{totalEmployees}</div>
-                      <div className="text-sm text-gray-600">Total Employees</div>
+                      <div className="text-lg sm:text-2xl font-bold text-blue-600">{totalEmployees}</div>
+                      <div className="text-xs sm:text-sm text-gray-600">Employees</div>
                     </div>
                   </CardContent>
                 </Card>
                 <Card>
-                  <CardContent className="pt-6">
+                  <CardContent className="pt-4 sm:pt-6">
                     <div className="text-center">
-                      <div className="text-2xl font-bold text-purple-600">{totalHoursSum.toFixed(1)}</div>
-                      <div className="text-sm text-gray-600">Total Hours</div>
+                      <div className="text-lg sm:text-2xl font-bold text-purple-600">{totalHoursSum.toFixed(1)}</div>
+                      <div className="text-xs sm:text-sm text-gray-600">Hours</div>
                     </div>
                   </CardContent>
                 </Card>
                 <Card>
-                  <CardContent className="pt-6">
+                  <CardContent className="pt-4 sm:pt-6">
                     <div className="text-center">
-                      <div className="text-2xl font-bold text-orange-600">${totalGrossPay.toFixed(2)}</div>
-                      <div className="text-sm text-gray-600">Gross Pay</div>
+                      <div className="text-lg sm:text-2xl font-bold text-orange-600">${totalGrossPay.toFixed(2)}</div>
+                      <div className="text-xs sm:text-sm text-gray-600">Gross</div>
                     </div>
                   </CardContent>
                 </Card>
                 <Card>
-                  <CardContent className="pt-6">
+                  <CardContent className="pt-4 sm:pt-6">
                     <div className="text-center">
-                      <div className="text-2xl font-bold text-green-600">${totalPreviewAmount.toFixed(2)}</div>
-                      <div className="text-sm text-gray-600">Net Pay</div>
+                      <div className="text-lg sm:text-2xl font-bold text-green-600">${totalPreviewAmount.toFixed(2)}</div>
+                      <div className="text-xs sm:text-sm text-gray-600">Net</div>
                     </div>
                   </CardContent>
                 </Card>
@@ -507,11 +526,12 @@ export const PayrollGenerationWizard = ({ profiles, workingHours, onRefresh }: P
 
               {payrollPreview.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
-                  <p>No approved working hours found for the selected period and profiles.</p>
+                  <p className="text-sm sm:text-base">No approved working hours found for the selected period and profiles.</p>
                 </div>
               ) : (
                 <>
-                  <div className="max-h-96 overflow-y-auto border rounded-lg">
+                  {/* Desktop table view */}
+                  <div className="hidden lg:block max-h-96 overflow-y-auto border rounded-lg">
                     <table className="w-full">
                       <thead className="sticky top-0 bg-gray-50 border-b">
                         <tr>
@@ -551,28 +571,85 @@ export const PayrollGenerationWizard = ({ profiles, workingHours, onRefresh }: P
                     </table>
                   </div>
 
+                  {/* Mobile card view */}
+                  <div className="lg:hidden space-y-3 max-h-96 overflow-y-auto">
+                    {payrollPreview.map((preview) => (
+                      <Card key={preview.profile.id} className="border-l-4 border-l-green-500">
+                        <CardContent className="p-3 sm:p-4">
+                          <div className="space-y-3">
+                            {/* Header */}
+                            <div>
+                              <h4 className="font-semibold text-sm sm:text-base text-gray-900">
+                                {preview.profile.full_name}
+                              </h4>
+                              <p className="text-xs sm:text-sm text-gray-600">{preview.profile.role}</p>
+                            </div>
+
+                            {/* Hours breakdown */}
+                            <div className="grid grid-cols-3 gap-2 text-xs">
+                              <div className="text-center p-2 bg-blue-50 rounded">
+                                <div className="text-blue-600 font-medium">Regular</div>
+                                <div className="font-semibold text-blue-700">{preview.regularHours.toFixed(1)}h</div>
+                              </div>
+                              {preview.overtimeHours > 0 && (
+                                <div className="text-center p-2 bg-orange-50 rounded">
+                                  <div className="text-orange-600 font-medium">Overtime</div>
+                                  <div className="font-semibold text-orange-700">{preview.overtimeHours.toFixed(1)}h</div>
+                                </div>
+                              )}
+                              <div className="text-center p-2 bg-purple-50 rounded">
+                                <div className="text-purple-600 font-medium">Total</div>
+                                <div className="font-semibold text-purple-700">{preview.totalHours.toFixed(1)}h</div>
+                              </div>
+                            </div>
+
+                            {/* Financial details */}
+                            <div className="grid grid-cols-4 gap-2 text-xs pt-2 border-t">
+                              <div className="text-center">
+                                <div className="text-gray-600">Rate</div>
+                                <div className="font-semibold">${preview.hourlyRate.toFixed(2)}</div>
+                              </div>
+                              <div className="text-center">
+                                <div className="text-gray-600">Gross</div>
+                                <div className="font-semibold text-purple-700">${preview.grossPay.toFixed(2)}</div>
+                              </div>
+                              <div className="text-center">
+                                <div className="text-gray-600">Deduct</div>
+                                <div className="font-semibold text-red-600">${preview.deductions.toFixed(2)}</div>
+                              </div>
+                              <div className="text-center">
+                                <div className="text-gray-600">Net</div>
+                                <div className="font-semibold text-green-600">${preview.netPay.toFixed(2)}</div>
+                              </div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+
                   {/* Collapsible Working Hours Details */}
                   <Collapsible open={isWorkingHoursOpen} onOpenChange={setIsWorkingHoursOpen}>
                     <CollapsibleTrigger asChild>
-                      <Button variant="outline" className="w-full justify-between">
+                      <Button variant="outline" className="w-full justify-between text-sm" size="sm">
                         <span>View Working Hours Details</span>
                         {isWorkingHoursOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                       </Button>
                     </CollapsibleTrigger>
-                    <CollapsibleContent className="space-y-4 mt-4">
+                    <CollapsibleContent className="space-y-3 sm:space-y-4 mt-4">
                       {payrollPreview.map((preview) => (
                         <Card key={preview.profile.id}>
-                          <CardHeader className="pb-3">
-                            <CardTitle className="text-base">{preview.profile.full_name}</CardTitle>
+                          <CardHeader className="pb-2 sm:pb-3">
+                            <CardTitle className="text-sm sm:text-base">{preview.profile.full_name}</CardTitle>
                           </CardHeader>
                           <CardContent>
                             <div className="overflow-x-auto">
-                              <table className="w-full text-sm">
+                              <table className="w-full text-xs sm:text-sm">
                                 <thead>
                                   <tr className="border-b">
                                     <th className="text-left py-2">Date</th>
-                                    <th className="text-left py-2">Client</th>
-                                    <th className="text-left py-2">Project</th>
+                                    <th className="text-left py-2 hidden sm:table-cell">Client</th>
+                                    <th className="text-left py-2 hidden sm:table-cell">Project</th>
                                     <th className="text-left py-2">Hours</th>
                                     <th className="text-left py-2">Rate</th>
                                     <th className="text-left py-2">Amount</th>
@@ -582,8 +659,8 @@ export const PayrollGenerationWizard = ({ profiles, workingHours, onRefresh }: P
                                   {preview.workingHours.map((wh: any) => (
                                     <tr key={wh.id} className="border-b border-gray-100">
                                       <td className="py-2">{new Date(wh.date).toLocaleDateString()}</td>
-                                      <td className="py-2">{wh.clients?.company || 'N/A'}</td>
-                                      <td className="py-2">{wh.projects?.name || 'N/A'}</td>
+                                      <td className="py-2 hidden sm:table-cell">{wh.clients?.company || 'N/A'}</td>
+                                      <td className="py-2 hidden sm:table-cell">{wh.projects?.name || 'N/A'}</td>
                                       <td className="py-2">{wh.total_hours}h</td>
                                       <td className="py-2">${wh.hourly_rate}/hr</td>
                                       <td className="py-2">${(wh.total_hours * wh.hourly_rate).toFixed(2)}</td>
@@ -600,17 +677,24 @@ export const PayrollGenerationWizard = ({ profiles, workingHours, onRefresh }: P
                 </>
               )}
 
-              <div className="flex justify-between">
-                <Button variant="outline" onClick={() => setStep(1)}>
-                  Back: Edit Selection
+              <div className="flex flex-col sm:flex-row justify-between gap-3 pt-4 border-t">
+                <Button variant="outline" onClick={() => setStep(1)} className="text-sm" size="sm">
+                  <span className="hidden sm:inline">Back: Edit Selection</span>
+                  <span className="sm:hidden">Back</span>
                 </Button>
                 <Button 
                   onClick={generatePayroll}
                   disabled={loading || payrollPreview.length === 0}
-                  className="bg-green-600 hover:bg-green-700"
+                  className="bg-green-600 hover:bg-green-700 text-sm"
+                  size="sm"
                 >
-                  <DollarSign className="h-4 w-4 mr-2" />
-                  {loading ? "Generating..." : "Generate Payroll Records"}
+                  <DollarSign className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                  {loading ? "Generating..." : (
+                    <>
+                      <span className="hidden sm:inline">Generate Payroll Records</span>
+                      <span className="sm:hidden">Generate ({payrollPreview.length})</span>
+                    </>
+                  )}
                 </Button>
               </div>
             </div>

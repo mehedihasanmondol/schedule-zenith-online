@@ -165,18 +165,18 @@ export const SalaryReports = ({ payrolls, workingHours, bankTransactions, profil
   };
 
   return (
-    <div className="space-y-6">
-      {/* Controls */}
+    <div className="space-y-4 sm:space-y-6">
+      {/* Mobile-friendly Controls */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col space-y-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
             <CardTitle className="flex items-center gap-2">
               <TrendingUp className="h-5 w-5" />
-              Salary Reports & Analytics
+              <span className="text-lg sm:text-xl">Reports & Analytics</span>
             </CardTitle>
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
               <Select value={timeRange} onValueChange={setTimeRange}>
-                <SelectTrigger className="w-32">
+                <SelectTrigger className="w-full sm:w-32">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -186,91 +186,92 @@ export const SalaryReports = ({ payrolls, workingHours, bankTransactions, profil
                   <SelectItem value="1year">1 Year</SelectItem>
                 </SelectContent>
               </Select>
-              <Button variant="outline" onClick={exportReport}>
+              <Button variant="outline" onClick={exportReport} className="w-full sm:w-auto">
                 <Download className="h-4 w-4 mr-1" />
-                Export
+                <span className="sm:hidden">Export</span>
+                <span className="hidden sm:inline">Export</span>
               </Button>
             </div>
           </div>
         </CardHeader>
       </Card>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+      {/* Mobile-optimized Summary Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
         <Card>
           <CardContent className="pt-4">
             <div className="flex items-center justify-between">
-              <div className="text-sm text-gray-600">Total Net Pay</div>
-              <DollarSign className="h-4 w-4 text-green-600" />
+              <div className="text-xs sm:text-sm text-gray-600">Net Pay</div>
+              <DollarSign className="h-4 w-4 text-green-600 shrink-0" />
             </div>
-            <div className="text-2xl font-bold text-green-600">${summaryStats.totalNetPay.toFixed(2)}</div>
+            <div className="text-lg sm:text-xl lg:text-2xl font-bold text-green-600">${summaryStats.totalNetPay.toFixed(2)}</div>
           </CardContent>
         </Card>
 
         <Card>
           <CardContent className="pt-4">
             <div className="flex items-center justify-between">
-              <div className="text-sm text-gray-600">Total Hours</div>
-              <Calendar className="h-4 w-4 text-blue-600" />
+              <div className="text-xs sm:text-sm text-gray-600">Hours</div>
+              <Calendar className="h-4 w-4 text-blue-600 shrink-0" />
             </div>
-            <div className="text-2xl font-bold text-blue-600">{summaryStats.totalHours.toFixed(1)}</div>
+            <div className="text-lg sm:text-xl lg:text-2xl font-bold text-blue-600">{summaryStats.totalHours.toFixed(1)}</div>
           </CardContent>
         </Card>
 
         <Card>
           <CardContent className="pt-4">
             <div className="flex items-center justify-between">
-              <div className="text-sm text-gray-600">Employees</div>
-              <Users className="h-4 w-4 text-purple-600" />
+              <div className="text-xs sm:text-sm text-gray-600">Employees</div>
+              <Users className="h-4 w-4 text-purple-600 shrink-0" />
             </div>
-            <div className="text-2xl font-bold text-purple-600">{summaryStats.employeeCount}</div>
+            <div className="text-lg sm:text-xl lg:text-2xl font-bold text-purple-600">{summaryStats.employeeCount}</div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="col-span-2 sm:col-span-1">
           <CardContent className="pt-4">
             <div className="flex items-center justify-between">
-              <div className="text-sm text-gray-600">Avg Hourly Rate</div>
-              <DollarSign className="h-4 w-4 text-orange-600" />
+              <div className="text-xs sm:text-sm text-gray-600">Avg Rate</div>
+              <DollarSign className="h-4 w-4 text-orange-600 shrink-0" />
             </div>
-            <div className="text-2xl font-bold text-orange-600">${summaryStats.avgHourlyRate.toFixed(2)}</div>
+            <div className="text-lg sm:text-xl lg:text-2xl font-bold text-orange-600">${summaryStats.avgHourlyRate.toFixed(2)}</div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="col-span-2 sm:col-span-1">
           <CardContent className="pt-4">
             <div className="flex items-center justify-between">
-              <div className="text-sm text-gray-600">Total Deductions</div>
-              <DollarSign className="h-4 w-4 text-red-600" />
+              <div className="text-xs sm:text-sm text-gray-600">Deductions</div>
+              <DollarSign className="h-4 w-4 text-red-600 shrink-0" />
             </div>
-            <div className="text-2xl font-bold text-red-600">${summaryStats.totalDeductions.toFixed(2)}</div>
+            <div className="text-lg sm:text-xl lg:text-2xl font-bold text-red-600">${summaryStats.totalDeductions.toFixed(2)}</div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="col-span-2 sm:col-span-1">
           <CardContent className="pt-4">
             <div className="flex items-center justify-between">
-              <div className="text-sm text-gray-600">Gross Pay</div>
-              <DollarSign className="h-4 w-4 text-indigo-600" />
+              <div className="text-xs sm:text-sm text-gray-600">Gross Pay</div>
+              <DollarSign className="h-4 w-4 text-indigo-600 shrink-0" />
             </div>
-            <div className="text-2xl font-bold text-indigo-600">${summaryStats.totalGrossPay.toFixed(2)}</div>
+            <div className="text-lg sm:text-xl lg:text-2xl font-bold text-indigo-600">${summaryStats.totalGrossPay.toFixed(2)}</div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Mobile-friendly Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
         {/* Monthly Trends */}
         <Card>
           <CardHeader>
-            <CardTitle>Monthly Payroll Trends</CardTitle>
+            <CardTitle className="text-lg">Monthly Payroll Trends</CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={250}>
               <LineChart data={monthlyData}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis />
+                <XAxis dataKey="month" fontSize={12} />
+                <YAxis fontSize={12} />
                 <Tooltip formatter={(value: any) => [`$${value.toFixed(2)}`, 'Net Pay']} />
                 <Line type="monotone" dataKey="totalNetPay" stroke="#8884d8" strokeWidth={2} />
               </LineChart>
@@ -281,10 +282,10 @@ export const SalaryReports = ({ payrolls, workingHours, bankTransactions, profil
         {/* Role Distribution */}
         <Card>
           <CardHeader>
-            <CardTitle>Pay Distribution by Role</CardTitle>
+            <CardTitle className="text-lg">Pay Distribution by Role</CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={250}>
               <PieChart>
                 <Pie
                   data={roleData}
@@ -292,9 +293,10 @@ export const SalaryReports = ({ payrolls, workingHours, bankTransactions, profil
                   cy="50%"
                   labelLine={false}
                   label={({ role, percent }) => `${role} (${(percent * 100).toFixed(0)}%)`}
-                  outerRadius={80}
+                  outerRadius={70}
                   fill="#8884d8"
                   dataKey="totalPay"
+                  fontSize={10}
                 >
                   {roleData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -309,14 +311,14 @@ export const SalaryReports = ({ payrolls, workingHours, bankTransactions, profil
         {/* Top Earners */}
         <Card>
           <CardHeader>
-            <CardTitle>Top Earners</CardTitle>
+            <CardTitle className="text-lg">Top Earners</CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={250}>
               <BarChart data={topEarners} layout="horizontal">
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis type="number" />
-                <YAxis dataKey="name" type="category" width={80} />
+                <XAxis type="number" fontSize={12} />
+                <YAxis dataKey="name" type="category" width={60} fontSize={10} />
                 <Tooltip formatter={(value: any) => [`$${value.toFixed(2)}`, 'Total Pay']} />
                 <Bar dataKey="totalPay" fill="#82ca9d" />
               </BarChart>
@@ -327,14 +329,14 @@ export const SalaryReports = ({ payrolls, workingHours, bankTransactions, profil
         {/* Monthly Hours */}
         <Card>
           <CardHeader>
-            <CardTitle>Monthly Hours Worked</CardTitle>
+            <CardTitle className="text-lg">Monthly Hours Worked</CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={250}>
               <BarChart data={monthlyData}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis />
+                <XAxis dataKey="month" fontSize={12} />
+                <YAxis fontSize={12} />
                 <Tooltip formatter={(value: any) => [`${value.toFixed(1)} hrs`, 'Hours']} />
                 <Bar dataKey="totalHours" fill="#ffc658" />
               </BarChart>
@@ -343,35 +345,59 @@ export const SalaryReports = ({ payrolls, workingHours, bankTransactions, profil
         </Card>
       </div>
 
-      {/* Detailed Tables */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Mobile-friendly Detailed Tables */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
         {/* Role Breakdown Table */}
         <Card>
           <CardHeader>
-            <CardTitle>Role Analysis</CardTitle>
+            <CardTitle className="text-lg">Role Analysis</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
+            {/* Desktop table view */}
+            <div className="hidden sm:block overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-gray-200">
-                    <th className="text-left py-2 px-3 font-medium text-gray-600">Role</th>
-                    <th className="text-right py-2 px-3 font-medium text-gray-600">Count</th>
-                    <th className="text-right py-2 px-3 font-medium text-gray-600">Total Pay</th>
-                    <th className="text-right py-2 px-3 font-medium text-gray-600">Avg Pay</th>
+                    <th className="text-left py-2 px-3 font-medium text-gray-600 text-sm">Role</th>
+                    <th className="text-right py-2 px-3 font-medium text-gray-600 text-sm">Count</th>
+                    <th className="text-right py-2 px-3 font-medium text-gray-600 text-sm">Total Pay</th>
+                    <th className="text-right py-2 px-3 font-medium text-gray-600 text-sm">Avg Pay</th>
                   </tr>
                 </thead>
                 <tbody>
                   {roleData.map((role) => (
                     <tr key={role.role} className="border-b border-gray-100">
-                      <td className="py-2 px-3 font-medium">{role.role}</td>
-                      <td className="py-2 px-3 text-right">{role.count}</td>
-                      <td className="py-2 px-3 text-right">${role.totalPay.toFixed(2)}</td>
-                      <td className="py-2 px-3 text-right">${role.avgPay.toFixed(2)}</td>
+                      <td className="py-2 px-3 font-medium text-sm">{role.role}</td>
+                      <td className="py-2 px-3 text-right text-sm">{role.count}</td>
+                      <td className="py-2 px-3 text-right text-sm">${role.totalPay.toFixed(2)}</td>
+                      <td className="py-2 px-3 text-right text-sm">${role.avgPay.toFixed(2)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+            </div>
+            
+            {/* Mobile card view */}
+            <div className="sm:hidden space-y-3">
+              {roleData.map((role) => (
+                <div key={role.role} className="border rounded-lg p-3 bg-gray-50">
+                  <div className="font-semibold text-gray-900 mb-2">{role.role}</div>
+                  <div className="grid grid-cols-3 gap-2 text-xs">
+                    <div>
+                      <span className="text-gray-600">Count:</span>
+                      <div className="font-medium">{role.count}</div>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Total:</span>
+                      <div className="font-medium">${role.totalPay.toFixed(2)}</div>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Average:</span>
+                      <div className="font-medium">${role.avgPay.toFixed(2)}</div>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>
@@ -379,30 +405,54 @@ export const SalaryReports = ({ payrolls, workingHours, bankTransactions, profil
         {/* Top Earners Table */}
         <Card>
           <CardHeader>
-            <CardTitle>Top Earners Details</CardTitle>
+            <CardTitle className="text-lg">Top Earners Details</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
+            {/* Desktop table view */}
+            <div className="hidden sm:block overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-gray-200">
-                    <th className="text-left py-2 px-3 font-medium text-gray-600">Employee</th>
-                    <th className="text-right py-2 px-3 font-medium text-gray-600">Hours</th>
-                    <th className="text-right py-2 px-3 font-medium text-gray-600">Rate</th>
-                    <th className="text-right py-2 px-3 font-medium text-gray-600">Total Pay</th>
+                    <th className="text-left py-2 px-3 font-medium text-gray-600 text-sm">Employee</th>
+                    <th className="text-right py-2 px-3 font-medium text-gray-600 text-sm">Hours</th>
+                    <th className="text-right py-2 px-3 font-medium text-gray-600 text-sm">Rate</th>
+                    <th className="text-right py-2 px-3 font-medium text-gray-600 text-sm">Total Pay</th>
                   </tr>
                 </thead>
                 <tbody>
                   {topEarners.slice(0, 8).map((earner, index) => (
                     <tr key={index} className="border-b border-gray-100">
-                      <td className="py-2 px-3 font-medium">{earner.name}</td>
-                      <td className="py-2 px-3 text-right">{earner.totalHours.toFixed(1)}</td>
-                      <td className="py-2 px-3 text-right">${earner.avgHourlyRate.toFixed(2)}</td>
-                      <td className="py-2 px-3 text-right font-bold">${earner.totalPay.toFixed(2)}</td>
+                      <td className="py-2 px-3 font-medium text-sm">{earner.name}</td>
+                      <td className="py-2 px-3 text-right text-sm">{earner.totalHours.toFixed(1)}</td>
+                      <td className="py-2 px-3 text-right text-sm">${earner.avgHourlyRate.toFixed(2)}</td>
+                      <td className="py-2 px-3 text-right font-bold text-sm">${earner.totalPay.toFixed(2)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+            </div>
+            
+            {/* Mobile card view */}
+            <div className="sm:hidden space-y-3">
+              {topEarners.slice(0, 6).map((earner, index) => (
+                <div key={index} className="border rounded-lg p-3 bg-gray-50">
+                  <div className="font-semibold text-gray-900 mb-2">{earner.name}</div>
+                  <div className="grid grid-cols-3 gap-2 text-xs">
+                    <div>
+                      <span className="text-gray-600">Hours:</span>
+                      <div className="font-medium">{earner.totalHours.toFixed(1)}</div>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Rate:</span>
+                      <div className="font-medium">${earner.avgHourlyRate.toFixed(2)}</div>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Total:</span>
+                      <div className="font-bold text-green-600">${earner.totalPay.toFixed(2)}</div>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>

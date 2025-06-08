@@ -1,5 +1,5 @@
 
-import * as React from "react";
+import { MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -7,38 +7,36 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreVertical } from "lucide-react";
 
-interface ActionDropdownItem {
+export interface ActionItem {
   label: string;
   onClick: () => void;
-  icon?: React.ReactNode;
+  icon: React.ReactNode;
   destructive?: boolean;
 }
 
 interface ActionDropdownProps {
-  items: ActionDropdownItem[];
+  items: ActionItem[];
 }
 
 export const ActionDropdown = ({ items }: ActionDropdownProps) => {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm">
-          <MoreVertical className="h-4 w-4" />
+        <Button variant="ghost" className="h-8 w-8 p-0">
+          <span className="sr-only">Open menu</span>
+          <MoreHorizontal className="h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-48 bg-white border shadow-lg z-50">
+      <DropdownMenuContent align="end">
         {items.map((item, index) => (
-          <DropdownMenuItem
-            key={index}
+          <DropdownMenuItem 
+            key={index} 
             onClick={item.onClick}
-            className={`flex items-center gap-2 ${
-              item.destructive ? "text-red-600 hover:text-red-700 hover:bg-red-50" : "hover:bg-gray-50"
-            }`}
+            className={item.destructive ? "text-red-600" : ""}
           >
             {item.icon}
-            {item.label}
+            <span className="ml-2">{item.label}</span>
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>

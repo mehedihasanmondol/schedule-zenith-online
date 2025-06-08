@@ -7,9 +7,18 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Search, Edit, Trash2, Building2 } from "lucide-react";
+import { ActionDropdown, ActionItem } from "@/components/ui/action-dropdown";
 import { supabase } from "@/integrations/supabase/client";
 import { Client } from "@/types/database";
 import { useToast } from "@/hooks/use-toast";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 export const ClientManagement = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -41,7 +50,6 @@ export const ClientManagement = () => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      // Type cast the data to ensure proper typing
       setClients((data || []) as Client[]);
     } catch (error) {
       console.error('Error fetching clients:', error);
@@ -146,6 +154,20 @@ export const ClientManagement = () => {
     }
   };
 
+  const getActionItems = (client: Client): ActionItem[] => [
+    {
+      label: "Edit",
+      onClick: () => handleEdit(client),
+      icon: <Edit className="h-4 w-4" />
+    },
+    {
+      label: "Delete",
+      onClick: () => handleDelete(client.id),
+      icon: <Trash2 className="h-4 w-4" />,
+      destructive: true
+    }
+  ];
+
   const filteredClients = clients.filter(client =>
     client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     client.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -159,12 +181,12 @@ export const ClientManagement = () => {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-gray-900">Client Management</h1>
+    <div className="space-y-4 md:space-y-6 p-4 md:p-0">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Client Management</h1>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="flex items-center gap-2" onClick={() => {
+            <Button className="flex items-center gap-2 w-full sm:w-auto" onClick={() => {
               setEditingClient(null);
               setFormData({ name: "", email: "", phone: "", company: "", status: "active" });
             }}>
@@ -172,7 +194,7 @@ export const ClientManagement = () => {
               Add Client
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="w-[95vw] max-w-md">
             <DialogHeader>
               <DialogTitle>{editingClient ? "Edit Client" : "Add New Client"}</DialogTitle>
             </DialogHeader>
@@ -225,7 +247,7 @@ export const ClientManagement = () => {
                   </SelectContent>
                 </Select>
               </div>
-              <Button type="submit" disabled={loading}>
+              <Button type="submit" disabled={loading} className="w-full">
                 {loading ? "Saving..." : editingClient ? "Update Client" : "Add Client"}
               </Button>
             </form>
@@ -233,7 +255,7 @@ export const ClientManagement = () => {
         </Dialog>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-gray-600">Total Clients</CardTitle>
@@ -269,9 +291,9 @@ export const ClientManagement = () => {
 
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>Clients</CardTitle>
-            <div className="relative w-64">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <CardTitle className="text-lg md:text-xl">Clients</CardTitle>
+            <div className="relative w-full sm:w-64">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
               <Input
                 placeholder="Search clients..."
@@ -282,47 +304,77 @@ export const ClientManagement = () => {
             </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">Company</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">Contact</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">Email</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">Phone</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">Projects</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">Status</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredClients.map((client) => (
-                  <tr key={client.id} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="py-3 px-4 font-medium text-gray-900">{client.company}</td>
-                    <td className="py-3 px-4 text-gray-600">{client.name}</td>
-                    <td className="py-3 px-4 text-gray-600">{client.email}</td>
-                    <td className="py-3 px-4 text-gray-600">{client.phone || '-'}</td>
-                    <td className="py-3 px-4 text-gray-600">{projectCounts[client.id] || 0}</td>
-                    <td className="py-3 px-4">
-                      <Badge variant={client.status === "active" ? "default" : "secondary"}>
+        <CardContent className="p-0 sm:p-6">
+          <div className="w-full">
+            {/* Mobile/Tablet Card Layout */}
+            <div className="block lg:hidden space-y-3 p-4">
+              {filteredClients.map((client) => (
+                <div key={client.id} className="bg-white border rounded-lg p-4 space-y-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-medium text-sm text-gray-900 truncate">
+                        {client.company}
+                      </h3>
+                      <p className="text-xs text-gray-500 truncate">{client.name}</p>
+                      <p className="text-xs text-gray-500 truncate">{client.email}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant={client.status === "active" ? "default" : "secondary"} className="text-xs">
                         {client.status}
                       </Badge>
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-2">
-                        <Button variant="ghost" size="sm" onClick={() => handleEdit(client)}>
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700" onClick={() => handleDelete(client.id)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                      <ActionDropdown items={getActionItems(client)} />
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-3 text-xs">
+                    <div>
+                      <span className="text-gray-500">Phone:</span>
+                      <p className="font-medium">{client.phone || '-'}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Projects:</span>
+                      <p className="font-medium">{projectCounts[client.id] || 0}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop Table Layout */}
+            <div className="hidden lg:block overflow-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[180px]">Company</TableHead>
+                    <TableHead>Contact</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Phone</TableHead>
+                    <TableHead className="w-[80px]">Projects</TableHead>
+                    <TableHead className="w-[100px]">Status</TableHead>
+                    <TableHead className="w-[80px]">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredClients.map((client) => (
+                    <TableRow key={client.id}>
+                      <TableCell className="font-medium">{client.company}</TableCell>
+                      <TableCell className="text-sm">{client.name}</TableCell>
+                      <TableCell className="text-sm">{client.email}</TableCell>
+                      <TableCell className="text-sm">{client.phone || '-'}</TableCell>
+                      <TableCell className="text-sm">{projectCounts[client.id] || 0}</TableCell>
+                      <TableCell>
+                        <Badge variant={client.status === "active" ? "default" : "secondary"} className="text-xs">
+                          {client.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <ActionDropdown items={getActionItems(client)} />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </div>
         </CardContent>
       </Card>

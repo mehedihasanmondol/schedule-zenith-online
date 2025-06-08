@@ -4,13 +4,14 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, DollarSign, Calendar, FileText, Clock, Zap } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import type { Payroll as PayrollType, Profile, WorkingHour, BankAccount } from "@/types/database";
+import type { Payroll as PayrollType, Profile, WorkingHour, BankAccount, Client, Project } from "@/types/database";
 import { useToast } from "@/hooks/use-toast";
 import { PayrollDetailsDialog } from "@/components/salary/PayrollDetailsDialog";
 import { BankSelectionDialog } from "@/components/payroll/BankSelectionDialog";
 import { PayrollListWithFilters } from "@/components/payroll/PayrollListWithFilters";
 import { PayrollQuickGenerate } from "@/components/payroll/PayrollQuickGenerate";
 import { PayrollEditDialog } from "@/components/payroll/PayrollEditDialog";
+import { PayrollCreateDialog } from "@/components/payroll/PayrollCreateDialog";
 
 export const PayrollComponent = () => {
   const [payrolls, setPayrolls] = useState<PayrollType[]>([]);
@@ -18,6 +19,8 @@ export const PayrollComponent = () => {
   const [workingHours, setWorkingHours] = useState<WorkingHour[]>([]);
   const [profilesWithHours, setProfilesWithHours] = useState<Profile[]>([]);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedPayrollForView, setSelectedPayrollForView] = useState<PayrollType | null>(null);
   const [selectedPayrollForEdit, setSelectedPayrollForEdit] = useState<PayrollType | null>(null);
@@ -33,6 +36,7 @@ export const PayrollComponent = () => {
     fetchProfiles();
     fetchWorkingHours();
     fetchBankAccounts();
+    fetchClientsAndProjects();
   }, []);
 
   const fetchPayrolls = async () => {
@@ -100,6 +104,23 @@ export const PayrollComponent = () => {
     }
   };
 
+  const fetchClientsAndProjects = async () => {
+    try {
+      const [clientsRes, projectsRes] = await Promise.all([
+        supabase.from('clients').select('*').eq('status', 'active').order('company'),
+        supabase.from('projects').select('*').eq('status', 'active').order('name')
+      ]);
+
+      if (clientsRes.error) throw clientsRes.error;
+      if (projectsRes.error) throw projectsRes.error;
+
+      setClients(clientsRes.data as Client[]);
+      setProjects(projectsRes.data as Project[]);
+    } catch (error) {
+      console.error('Error fetching clients and projects:', error);
+    }
+  };
+
   const fetchWorkingHours = async () => {
     try {
       const { data, error } = await supabase
@@ -144,7 +165,6 @@ export const PayrollComponent = () => {
     try {
       const payroll = selectedPayrollForPayment;
 
-      // Get bank account details
       const { data: bankAccount, error: bankError } = await supabase
         .from('bank_accounts')
         .select('opening_balance')
@@ -153,7 +173,6 @@ export const PayrollComponent = () => {
 
       if (bankError) throw bankError;
 
-      // Get current balance by calculating all transactions
       const { data: transactions, error: transError } = await supabase
         .from('bank_transactions')
         .select('amount, type')
@@ -173,7 +192,6 @@ export const PayrollComponent = () => {
         return;
       }
 
-      // Create withdrawal transaction
       const { error: transactionError } = await supabase
         .from('bank_transactions')
         .insert({
@@ -188,7 +206,6 @@ export const PayrollComponent = () => {
 
       if (transactionError) throw transactionError;
 
-      // Update payroll status and bank account
       const { error } = await supabase
         .from('payroll')
         .update({ 
@@ -199,7 +216,6 @@ export const PayrollComponent = () => {
 
       if (error) throw error;
 
-      // Send notification for payment
       const { error: notificationError } = await supabase
         .from('notifications')
         .insert({
@@ -264,7 +280,6 @@ export const PayrollComponent = () => {
 
   const handleCreatePayroll = () => {
     // This will trigger the PayrollQuickGenerate dialog
-    // We can pass this function to both tabs
   };
 
   const handleEditPayroll = (payroll: PayrollType) => {
@@ -302,26 +317,38 @@ export const PayrollComponent = () => {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 sm:space-y-6 p-2 sm:p-4 lg:p-6">
+      {/* Mobile-friendly header */}
+      <div className="flex flex-col space-y-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
         <div className="flex items-center gap-3">
-          <DollarSign className="h-8 w-8 text-green-600" />
+          <DollarSign className="h-6 w-6 sm:h-8 sm:w-8 text-green-600" />
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Payroll</h1>
-            <p className="text-gray-600">Manage employee payroll and payments</p>
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">Payroll</h1>
+            <p className="text-sm sm:text-base text-gray-600">Manage employee payroll and payments</p>
           </div>
         </div>
+        
+        {profiles.length > 0 && (
+          <div className="w-full sm:w-auto">
+            <PayrollCreateDialog
+              profiles={profiles}
+              profilesWithHours={profilesWithHours}
+              workingHours={workingHours}
+              onRefresh={fetchPayrolls}
+            />
+          </div>
+        )}
       </div>
 
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      {/* Mobile-optimized Statistics Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Total Payroll</CardTitle>
-            <DollarSign className="h-5 w-5 text-green-600" />
+            <CardTitle className="text-xs sm:text-sm font-medium text-gray-600">Total Payroll</CardTitle>
+            <DollarSign className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 shrink-0" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-gray-900">
+            <div className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">
               ${payrolls.reduce((sum, p) => sum + p.gross_pay, 0).toLocaleString()}
             </div>
           </CardContent>
@@ -329,11 +356,11 @@ export const PayrollComponent = () => {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Pending</CardTitle>
-            <Calendar className="h-5 w-5 text-orange-600" />
+            <CardTitle className="text-xs sm:text-sm font-medium text-gray-600">Pending</CardTitle>
+            <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-orange-600 shrink-0" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-gray-900">
+            <div className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">
               {payrolls.filter(p => p.status === 'pending').length}
             </div>
           </CardContent>
@@ -341,11 +368,11 @@ export const PayrollComponent = () => {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Approved</CardTitle>
-            <FileText className="h-5 w-5 text-blue-600" />
+            <CardTitle className="text-xs sm:text-sm font-medium text-gray-600">Approved</CardTitle>
+            <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 shrink-0" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-gray-900">
+            <div className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">
               {payrolls.filter(p => p.status === 'approved').length}
             </div>
           </CardContent>
@@ -353,22 +380,28 @@ export const PayrollComponent = () => {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Paid</CardTitle>
-            <DollarSign className="h-5 w-5 text-green-600" />
+            <CardTitle className="text-xs sm:text-sm font-medium text-gray-600">Paid</CardTitle>
+            <DollarSign className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 shrink-0" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-gray-900">
+            <div className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">
               {payrolls.filter(p => p.status === 'paid').length}
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Tabs for Payroll Management */}
+      {/* Mobile-friendly Tabs for Payroll Management */}
       <Tabs defaultValue="payroll-records" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="payroll-records">Payroll Records</TabsTrigger>
-          <TabsTrigger value="quick-generator">Quick Payroll Generator</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-2 h-auto">
+          <TabsTrigger value="payroll-records" className="text-xs sm:text-sm py-2">
+            <span className="sm:hidden">Records</span>
+            <span className="hidden sm:inline">Payroll Records</span>
+          </TabsTrigger>
+          <TabsTrigger value="quick-generator" className="text-xs sm:text-sm py-2">
+            <span className="sm:hidden">Generator</span>
+            <span className="hidden sm:inline">Quick Generator</span>
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="payroll-records">
@@ -384,6 +417,8 @@ export const PayrollComponent = () => {
             profiles={profiles}
             profilesWithHours={profilesWithHours}
             workingHours={workingHours}
+            clients={clients}
+            projects={projects}
             onRefresh={fetchPayrolls}
           />
         </TabsContent>
@@ -431,14 +466,58 @@ export const PayrollComponent = () => {
                         : profile.hourly_rate || 0;
                       const estimatedPay = totalHours * avgRate;
                       
-                      // Get date range of available hours
                       const dates = profileHours.map(wh => new Date(wh.date)).sort((a, b) => a.getTime() - b.getTime());
                       const startDate = dates[0]?.toLocaleDateString();
                       const endDate = dates[dates.length - 1]?.toLocaleDateString();
                       
                       return (
-                        <div key={profile.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
-                          <div className="flex items-center justify-between">
+                        <div key={profile.id} className="border rounded-lg p-3 sm:p-4 hover:bg-gray-50 transition-colors">
+                          {/* Mobile Layout */}
+                          <div className="block sm:hidden">
+                            <div className="flex items-center gap-3 mb-3">
+                              <div className="h-10 w-10 bg-gray-200 rounded-full flex items-center justify-center shrink-0">
+                                <span className="font-medium text-gray-700 text-sm">
+                                  {profile.full_name.split(' ').map(n => n[0]).join('')}
+                                </span>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <h3 className="font-medium text-gray-900 truncate">{profile.full_name}</h3>
+                                <p className="text-sm text-gray-600">{profile.role}</p>
+                              </div>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-3 text-xs mb-3">
+                              <div className="bg-gray-50 p-2 rounded">
+                                <span className="text-gray-600 block">Hours:</span>
+                                <div className="font-medium">{totalHours.toFixed(1)}h</div>
+                              </div>
+                              <div className="bg-gray-50 p-2 rounded">
+                                <span className="text-gray-600 block">Rate:</span>
+                                <div className="font-medium">${avgRate.toFixed(2)}/hr</div>
+                              </div>
+                              <div className="bg-gray-50 p-2 rounded col-span-2">
+                                <span className="text-gray-600 block">Period:</span>
+                                <div className="font-medium text-xs">{startDate} - {endDate}</div>
+                              </div>
+                              <div className="bg-green-50 p-2 rounded col-span-2">
+                                <span className="text-gray-600 block">Estimated Pay:</span>
+                                <div className="font-medium text-green-600">${estimatedPay.toFixed(2)}</div>
+                              </div>
+                            </div>
+                            
+                            <div className="flex justify-end">
+                              <PayrollQuickGenerate
+                                profiles={profiles}
+                                profilesWithHours={profilesWithHours}
+                                workingHours={workingHours}
+                                onRefresh={fetchPayrolls}
+                                preSelectedProfile={profile}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Desktop Layout */}
+                          <div className="hidden sm:flex items-center justify-between">
                             <div className="flex-1">
                               <div className="flex items-center gap-3 mb-2">
                                 <div className="h-10 w-10 bg-gray-200 rounded-full flex items-center justify-center">

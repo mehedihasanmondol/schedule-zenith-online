@@ -8,8 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Clock, ChevronDown, ChevronUp, Zap } from "lucide-react";
-import type { Payroll as PayrollType, WorkingHour } from "@/types/database";
+import { Clock, ChevronDown, ChevronUp, Zap, Link } from "lucide-react";
+import type { Payroll as PayrollType, WorkingHour, PayrollWorkingHours } from "@/types/database";
 
 interface PayrollEditDialogProps {
   payroll: PayrollType | null;
@@ -20,7 +20,7 @@ interface PayrollEditDialogProps {
 
 export const PayrollEditDialog = ({ payroll, isOpen, onClose, onSuccess }: PayrollEditDialogProps) => {
   const [loading, setLoading] = useState(false);
-  const [workingHours, setWorkingHours] = useState<WorkingHour[]>([]);
+  const [linkedWorkingHours, setLinkedWorkingHours] = useState<WorkingHour[]>([]);
   const [isWorkingHoursPreviewOpen, setIsWorkingHoursPreviewOpen] = useState(false);
   const [formData, setFormData] = useState({
     pay_period_start: "",
@@ -48,33 +48,41 @@ export const PayrollEditDialog = ({ payroll, isOpen, onClose, onSuccess }: Payro
         status: payroll.status
       });
       
-      // Fetch working hours for this payroll period
-      fetchWorkingHours();
+      // Fetch the actually linked working hours from the new table
+      fetchLinkedWorkingHours();
     }
   }, [payroll, isOpen]);
 
-  const fetchWorkingHours = async () => {
+  const fetchLinkedWorkingHours = async () => {
     if (!payroll) return;
     
     try {
       const { data, error } = await supabase
-        .from('working_hours')
+        .from('payroll_working_hours')
         .select(`
           *,
-          clients!working_hours_client_id_fkey (id, name, company, email, status, created_at, updated_at),
-          projects!working_hours_project_id_fkey (id, name)
+          working_hours!inner (
+            *,
+            clients!working_hours_client_id_fkey (id, name, company, email, status, created_at, updated_at),
+            projects!working_hours_project_id_fkey (id, name)
+          )
         `)
-        .eq('profile_id', payroll.profile_id)
-        .gte('date', payroll.pay_period_start)
-        .lte('date', payroll.pay_period_end)
-        .eq('status', 'approved')
-        .order('date', { ascending: false });
+        .eq('payroll_id', payroll.id)
+        .order('working_hours.date', { ascending: false });
 
       if (error) throw error;
-      setWorkingHours((data || []) as WorkingHour[]);
-      setIsWorkingHoursPreviewOpen(data && data.length > 0);
+      
+      // Extract the working hours from the linked records
+      const workingHours = (data || []).map((item: PayrollWorkingHours & { working_hours: WorkingHour }) => item.working_hours);
+      setLinkedWorkingHours(workingHours);
+      setIsWorkingHoursPreviewOpen(workingHours.length > 0);
     } catch (error) {
-      console.error('Error fetching working hours:', error);
+      console.error('Error fetching linked working hours:', error);
+      toast({
+        title: "Warning",
+        description: "Could not fetch linked working hours",
+        variant: "destructive"
+      });
     }
   };
 
@@ -102,10 +110,10 @@ export const PayrollEditDialog = ({ payroll, isOpen, onClose, onSuccess }: Payro
     });
   };
 
-  const recalculateFromWorkingHours = () => {
-    if (workingHours.length > 0) {
-      const totalHours = workingHours.reduce((sum, wh) => sum + wh.total_hours, 0);
-      const avgHourlyRate = workingHours.reduce((sum, wh) => sum + (wh.hourly_rate || 0), 0) / workingHours.length;
+  const recalculateFromLinkedWorkingHours = () => {
+    if (linkedWorkingHours.length > 0) {
+      const totalHours = linkedWorkingHours.reduce((sum, wh) => sum + wh.total_hours, 0);
+      const avgHourlyRate = linkedWorkingHours.reduce((sum, wh) => sum + (wh.hourly_rate || 0), 0) / linkedWorkingHours.length;
       const grossPay = totalHours * avgHourlyRate;
       
       setFormData(prev => ({
@@ -118,7 +126,7 @@ export const PayrollEditDialog = ({ payroll, isOpen, onClose, onSuccess }: Payro
 
       toast({
         title: "Recalculated",
-        description: "Payroll has been recalculated based on approved working hours"
+        description: `Payroll recalculated from ${linkedWorkingHours.length} linked working hours`
       });
     }
   };
@@ -187,16 +195,16 @@ export const PayrollEditDialog = ({ payroll, isOpen, onClose, onSuccess }: Payro
                 <p className="text-sm text-blue-700">{payroll.profiles?.role}</p>
               </div>
             </div>
-            {workingHours.length > 0 && (
+            {linkedWorkingHours.length > 0 && (
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={recalculateFromWorkingHours}
+                onClick={recalculateFromLinkedWorkingHours}
                 className="w-full flex items-center gap-2"
               >
                 <Zap className="h-4 w-4" />
-                Recalculate from Working Hours ({workingHours.length} entries)
+                Recalculate from Linked Working Hours ({linkedWorkingHours.length} entries)
               </Button>
             )}
           </div>
@@ -317,13 +325,13 @@ export const PayrollEditDialog = ({ payroll, isOpen, onClose, onSuccess }: Payro
             </Select>
           </div>
 
-          {workingHours.length > 0 && (
+          {linkedWorkingHours.length > 0 && (
             <Collapsible open={isWorkingHoursPreviewOpen} onOpenChange={setIsWorkingHoursPreviewOpen}>
               <CollapsibleTrigger asChild>
                 <Button type="button" variant="outline" className="w-full justify-between">
                   <span className="flex items-center gap-2">
-                    <Clock className="h-4 w-4" />
-                    Working Hours Preview ({workingHours.length} entries)
+                    <Link className="h-4 w-4" />
+                    Linked Working Hours ({linkedWorkingHours.length} entries)
                   </span>
                   {isWorkingHoursPreviewOpen ? (
                     <ChevronUp className="h-4 w-4" />
@@ -335,13 +343,17 @@ export const PayrollEditDialog = ({ payroll, isOpen, onClose, onSuccess }: Payro
               <CollapsibleContent className="mt-3">
                 <div className="border rounded-lg p-4">
                   <div className="max-h-40 overflow-y-auto space-y-2">
-                    {workingHours.map((wh) => (
-                      <div key={wh.id} className="flex justify-between items-center text-sm bg-gray-50 p-2 rounded">
+                    {linkedWorkingHours.map((wh) => (
+                      <div key={wh.id} className="flex justify-between items-center text-sm bg-green-50 p-2 rounded border border-green-200">
                         <div>
                           <span className="font-medium">{new Date(wh.date).toLocaleDateString()}</span>
                           <span className="text-gray-600 ml-2">
                             {wh.clients?.company || 'N/A'} - {wh.projects?.name || 'N/A'}
                           </span>
+                          <div className="text-xs text-green-700 flex items-center gap-1 mt-1">
+                            <Link className="h-3 w-3" />
+                            Linked to this payroll
+                          </div>
                         </div>
                         <div className="text-right">
                           <div>{wh.total_hours}h × ${wh.hourly_rate}/hr</div>

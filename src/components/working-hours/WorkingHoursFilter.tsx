@@ -2,7 +2,9 @@
 import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Calendar } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Search, Calendar, Filter } from "lucide-react";
 import { Profile, Client, Project } from "@/types/database";
 
 interface WorkingHoursFilterProps {
@@ -172,62 +174,89 @@ export const WorkingHoursFilter = ({
           onChange={(e) => setSearchTerm(e.target.value)}
           className="w-64"
         />
+        
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="sm" className="h-10 w-10 p-0">
+              <Filter className="h-4 w-4" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-80" align="end">
+            <div className="space-y-4">
+              <h4 className="font-medium text-sm">Filters</h4>
+              
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs font-medium text-gray-600 mb-1 block">Profile</label>
+                  <Select value={profileFilter} onValueChange={setProfileFilter}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="All Profiles" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Profiles</SelectItem>
+                      {profiles.map((profile) => (
+                        <SelectItem key={profile.id} value={profile.id}>
+                          {profile.full_name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-gray-600 mb-1 block">Client</label>
+                  <Select value={clientFilter} onValueChange={setClientFilter}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="All Clients" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Clients</SelectItem>
+                      {clients.map((client) => (
+                        <SelectItem key={client.id} value={client.id}>
+                          {client.company}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-gray-600 mb-1 block">Project</label>
+                  <Select value={projectFilter} onValueChange={setProjectFilter}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="All Projects" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Projects</SelectItem>
+                      {projects.map((project) => (
+                        <SelectItem key={project.id} value={project.id}>
+                          {project.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-gray-600 mb-1 block">Status</label>
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="All Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Status</SelectItem>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="approved">Approved</SelectItem>
+                      <SelectItem value="rejected">Rejected</SelectItem>
+                      <SelectItem value="paid">Paid</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+          </PopoverContent>
+        </Popover>
       </div>
-      
-      <Select value={profileFilter} onValueChange={setProfileFilter}>
-        <SelectTrigger className="w-48">
-          <SelectValue placeholder="All Profiles" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All Profiles</SelectItem>
-          {profiles.map((profile) => (
-            <SelectItem key={profile.id} value={profile.id}>
-              {profile.full_name}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      
-      <Select value={clientFilter} onValueChange={setClientFilter}>
-        <SelectTrigger className="w-48">
-          <SelectValue placeholder="All Clients" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All Clients</SelectItem>
-          {clients.map((client) => (
-            <SelectItem key={client.id} value={client.id}>
-              {client.company}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      
-      <Select value={projectFilter} onValueChange={setProjectFilter}>
-        <SelectTrigger className="w-48">
-          <SelectValue placeholder="All Projects" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All Projects</SelectItem>
-          {projects.map((project) => (
-            <SelectItem key={project.id} value={project.id}>
-              {project.name}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      
-      <Select value={statusFilter} onValueChange={setStatusFilter}>
-        <SelectTrigger className="w-32">
-          <SelectValue placeholder="Status" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All Status</SelectItem>
-          <SelectItem value="pending">Pending</SelectItem>
-          <SelectItem value="approved">Approved</SelectItem>
-          <SelectItem value="rejected">Rejected</SelectItem>
-          <SelectItem value="paid">Paid</SelectItem>
-        </SelectContent>
-      </Select>
     </div>
   );
 };

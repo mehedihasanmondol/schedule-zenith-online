@@ -119,16 +119,16 @@ export const ProfileManagement = () => {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 md:space-y-6 p-4 md:p-0">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <Users className="h-8 w-8 text-blue-600" />
+          <Users className="h-6 w-6 md:h-8 md:w-8 text-blue-600" />
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Profile Management</h1>
-            <p className="text-gray-600">Manage user profiles and their information</p>
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Profile Management</h1>
+            <p className="text-sm md:text-base text-gray-600">Manage user profiles and their information</p>
           </div>
         </div>
-        <Button onClick={() => setIsFormOpen(true)}>
+        <Button onClick={() => setIsFormOpen(true)} className="w-full sm:w-auto">
           <Plus className="h-4 w-4 mr-2" />
           Add Profile
         </Button>
@@ -138,28 +138,28 @@ export const ProfileManagement = () => {
 
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>All Profiles ({filteredProfiles.length})</CardTitle>
-            <div className="flex items-center gap-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                <Input
-                  placeholder="Search profiles..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 w-64"
-                />
-              </div>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <CardTitle className="text-lg md:text-xl">All Profiles ({filteredProfiles.length})</CardTitle>
+            <div className="relative w-full sm:w-64">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Input
+                placeholder="Search profiles..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
             </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <ProfileTable 
-            profiles={filteredProfiles} 
-            onEdit={handleEdit} 
-            onDelete={handleDelete}
-            onManageBank={(profile) => setSelectedProfileForBank(profile)}
-          />
+        <CardContent className="p-0 sm:p-6">
+          <div className="overflow-x-auto">
+            <ProfileTable 
+              profiles={filteredProfiles} 
+              onEdit={handleEdit} 
+              onDelete={handleDelete}
+              onManageBank={(profile) => setSelectedProfileForBank(profile)}
+            />
+          </div>
         </CardContent>
       </Card>
 

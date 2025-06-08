@@ -75,7 +75,7 @@ export const PayrollDetailsDialog = ({
         .order('date', { ascending: true });
 
       if (hoursError) throw hoursError;
-      setWorkingHours(hoursData || []);
+      setWorkingHours((hoursData || []) as WorkingHour[]);
 
     } catch (error) {
       console.error('Error fetching payroll details:', error);

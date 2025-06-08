@@ -1,5 +1,5 @@
 
-import { ActionDropdown } from "@/components/ui/action-dropdown";
+import { ActionDropdown, ActionItem } from "@/components/ui/action-dropdown";
 import { Edit, Trash2, Eye } from "lucide-react";
 import { Roster as RosterType } from "@/types/database";
 
@@ -13,7 +13,7 @@ interface RosterActionsProps {
 export const RosterActions = ({ roster, onEdit, onDelete, onView }: RosterActionsProps) => {
   const canEditDelete = roster.status !== 'cancelled';
 
-  const items = [
+  const items: ActionItem[] = [
     {
       label: "View Details",
       onClick: () => onView(roster),
