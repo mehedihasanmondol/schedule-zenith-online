@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -60,22 +59,27 @@ export const PayrollDetailsDialog = ({
         setBankAccount(bankData);
       }
 
-      // Fetch working hours for the pay period
+      // Fetch working hours linked to this specific payroll via payroll_working_hours
       const { data: hoursData, error: hoursError } = await supabase
-        .from('working_hours')
+        .from('payroll_working_hours')
         .select(`
-          *,
-          clients!working_hours_client_id_fkey (id, name, company),
-          projects!working_hours_project_id_fkey (id, name)
+          working_hours:working_hours_id (
+            *,
+            clients!working_hours_client_id_fkey (id, name, company),
+            projects!working_hours_project_id_fkey (id, name)
+          )
         `)
-        .eq('profile_id', payroll.profile_id)
-        .gte('date', payroll.pay_period_start)
-        .lte('date', payroll.pay_period_end)
-        .eq('status', 'approved')
-        .order('date', { ascending: true });
+        .eq('payroll_id', payroll.id);
 
       if (hoursError) throw hoursError;
-      setWorkingHours((hoursData || []) as WorkingHour[]);
+      
+      // Extract working hours from the junction table response
+      const linkedWorkingHours = (hoursData || [])
+        .map(link => link.working_hours)
+        .filter(wh => wh !== null)
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+      setWorkingHours(linkedWorkingHours as WorkingHour[]);
 
     } catch (error) {
       console.error('Error fetching payroll details:', error);
@@ -358,13 +362,13 @@ This is an automatically generated payslip.
             </Card>
           )}
 
-          {/* Working Hours Breakdown */}
+          {/* Working Hours Breakdown - Now showing only linked working hours */}
           {workingHours.length > 0 && (
             <Card className="print:shadow-none print:border">
               <CardHeader className="print:pb-2">
                 <CardTitle className="flex items-center gap-2 text-lg print:text-base">
                   <Clock className="h-5 w-5" />
-                  Working Hours Breakdown ({workingHours.length} entries)
+                  Linked Working Hours ({workingHours.length} entries)
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -401,6 +405,22 @@ This is an automatically generated payslip.
                       </tr>
                     </tfoot>
                   </table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {workingHours.length === 0 && (
+            <Card className="print:shadow-none print:border">
+              <CardHeader className="print:pb-2">
+                <CardTitle className="flex items-center gap-2 text-lg print:text-base">
+                  <Clock className="h-5 w-5" />
+                  Linked Working Hours
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-8 text-gray-500">
+                  No working hours linked to this payroll record.
                 </div>
               </CardContent>
             </Card>
