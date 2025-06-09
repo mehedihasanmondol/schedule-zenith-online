@@ -153,16 +153,7 @@ const Index = () => {
           <div className="flex items-center flex-1">
             {/* Navigation Toggle */}
             <div className="mr-3 md:mr-4">
-              {/* Desktop Sidebar Toggle */}
-              <div className="hidden md:block">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                >
-                  <Menu className="h-5 w-5" />
-                </Button>
-              </div>
+              
 
               {/* Mobile Navigation Sheet */}
               <div className="md:hidden">
