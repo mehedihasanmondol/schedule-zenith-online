@@ -149,35 +149,32 @@ const Index = () => {
         {/* Sticky Header */}
         <div className="sticky top-0 z-40 flex justify-between items-center p-2 md:p-4 bg-white border-b border-gray-200">
           {/* Left side - Navigation Toggle + App Name (Mobile Only) */}
-          <div className="flex items-center flex-1">
-            {/* Navigation Toggle - Mobile only for sheet, Desktop hidden */}
-            <div className="mr-3 md:mr-0">
-              {/* Mobile Navigation Sheet */}
-              <div className="md:hidden">
-                <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
-                  <SheetTrigger asChild>
-                    <Button variant="ghost" size="icon">
-                      <Menu className="h-5 w-5" />
-                    </Button>
-                  </SheetTrigger>
-                  <SheetContent side="left" className="w-64 p-0">
-                    <Sidebar 
-                      activeTab={activeTab} 
-                      onTabChange={(tab) => {
-                        setActiveTab(tab);
-                        setMobileNavOpen(false);
-                      }} 
-                      hasPermission={hasPermission}
-                      onCollapsedChange={() => {}}
-                      isMobile={true}
-                    />
-                  </SheetContent>
-                </Sheet>
-              </div>
+          <div className="flex items-center">
+            {/* Navigation Toggle - Mobile only for sheet */}
+            <div className="mr-3 md:hidden">
+              <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="icon">
+                    <Menu className="h-5 w-5" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="left" className="w-64 p-0">
+                  <Sidebar 
+                    activeTab={activeTab} 
+                    onTabChange={(tab) => {
+                      setActiveTab(tab);
+                      setMobileNavOpen(false);
+                    }} 
+                    hasPermission={hasPermission}
+                    onCollapsedChange={() => {}}
+                    isMobile={true}
+                  />
+                </SheetContent>
+              </Sheet>
             </div>
 
             {/* App Name - Mobile only */}
-            <div className="md:hidden flex-1">
+            <div className="md:hidden">
               <h1 className="text-lg font-semibold text-gray-900">
                 Schedule & Payroll
               </h1>
