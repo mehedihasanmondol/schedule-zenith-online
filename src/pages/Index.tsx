@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -148,7 +149,7 @@ const Index = () => {
       }`}>
         {/* Sticky Header */}
         <div className="sticky top-0 z-40 flex justify-between items-center p-2 md:p-4 bg-white border-b border-gray-200">
-          {/* Left side - Navigation Toggle + App Name (Mobile Only) */}
+          {/* Left side - Navigation Toggle + App Name */}
           <div className="flex items-center">
             {/* Navigation Toggle - Mobile only for sheet */}
             <div className="mr-3 md:hidden">
@@ -173,8 +174,8 @@ const Index = () => {
               </Sheet>
             </div>
 
-            {/* App Name - Mobile only */}
-            <div className="md:hidden">
+            {/* App Name - Mobile always, Desktop only when sidebar collapsed */}
+            <div className={`md:${sidebarCollapsed ? 'block' : 'hidden'} block`}>
               <h1 className="text-lg font-semibold text-gray-900">
                 Schedule & Payroll
               </h1>
