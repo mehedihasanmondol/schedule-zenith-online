@@ -12,6 +12,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { BankAccount, BankTransaction, Profile, Client, Project } from "@/types/database";
 import { useToast } from "@/hooks/use-toast";
 import { ProfileSelector } from "@/components/common/ProfileSelector";
+import { BankBalanceStats } from "@/components/bank/BankBalanceStats";
+import { TransactionList } from "@/components/bank/TransactionList";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 export const BankBalance = () => {
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
@@ -35,6 +38,7 @@ export const BankBalance = () => {
   const [editingTransaction, setEditingTransaction] = useState<BankTransaction | null>(null);
   const [editingBankAccount, setEditingBankAccount] = useState<BankAccount | null>(null);
   const { toast } = useToast();
+  const isMobile = useIsMobile();
 
   const categoryOptions = [
     { value: "income", label: "Income" },
@@ -572,24 +576,27 @@ export const BankBalance = () => {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 md:space-y-6 p-4 md:p-0">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <Building className="h-8 w-8 text-green-600" />
+          <Building className="h-6 w-6 md:h-8 md:w-8 text-green-600" />
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Bank Balance</h1>
-            <p className="text-gray-600">Manage bank accounts and transactions</p>
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Bank Balance</h1>
+            <p className="text-sm md:text-base text-gray-600">Manage bank accounts and transactions</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        
+        {/* Action Buttons */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
           <Dialog open={isDepositDialogOpen} onOpenChange={(open) => { setIsDepositDialogOpen(open); if (!open) resetQuickTransactionForm(); }}>
             <DialogTrigger asChild>
-              <Button className="flex items-center gap-2 bg-green-600 hover:bg-green-700">
+              <Button className="flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700">
                 <Plus className="h-4 w-4" />
-                Deposit
+                {isMobile ? "Deposit" : "Add Deposit"}
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-md">
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>{editingTransaction ? 'Edit Deposit' : 'Quick Deposit'}</DialogTitle>
               </DialogHeader>
@@ -604,6 +611,57 @@ export const BankBalance = () => {
                       {orphanBankAccounts.map((account) => (
                         <SelectItem key={account.id} value={account.id}>
                           {account.bank_name} - {account.account_number}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="deposit_amount">Amount</Label>
+                  <Input
+                    id="deposit_amount"
+                    type="number"
+                    step="0.01"
+                    value={quickTransactionData.amount}
+                    onChange={(e) => setQuickTransactionData({ ...quickTransactionData, amount: parseFloat(e.target.value) || 0 })}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="deposit_date">Date</Label>
+                  <Input
+                    id="deposit_date"
+                    type="date"
+                    value={quickTransactionData.date}
+                    onChange={(e) => setQuickTransactionData({ ...quickTransactionData, date: e.target.value })}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="deposit_description">Description</Label>
+                  <Input
+                    id="deposit_description"
+                    value={quickTransactionData.description}
+                    onChange={(e) => setQuickTransactionData({ ...quickTransactionData, description: e.target.value })}
+                    placeholder="Enter description"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="deposit_category">Category (Optional)</Label>
+                  <Select value={quickTransactionData.category} onValueChange={(value) => setQuickTransactionData({ ...quickTransactionData, category: value as typeof quickTransactionData.category })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select category (optional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="no-category">No Category</SelectItem>
+                      {categoryOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -653,60 +711,26 @@ export const BankBalance = () => {
                   showRoleFilter={true}
                 />
 
-                <div>
-                  <Label htmlFor="deposit_description">Description</Label>
-                  <Input
-                    id="deposit_description"
-                    value={quickTransactionData.description}
-                    onChange={(e) => setQuickTransactionData({ ...quickTransactionData, description: e.target.value })}
-                    required
-                  />
+                <div className="flex gap-2 pt-4">
+                  <Button type="button" variant="outline" onClick={() => setIsDepositDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={loading} className="flex-1 bg-green-600 hover:bg-green-700">
+                    {loading ? "Adding..." : editingTransaction ? "Update Deposit" : "Add Deposit"}
+                  </Button>
                 </div>
-
-                <div>
-                  <Label htmlFor="deposit_amount">Amount</Label>
-                  <Input
-                    id="deposit_amount"
-                    type="number"
-                    step="0.01"
-                    value={quickTransactionData.amount}
-                    onChange={(e) => setQuickTransactionData({ ...quickTransactionData, amount: parseFloat(e.target.value) || 0 })}
-                    required
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="deposit_category">Category (Optional)</Label>
-                  <Select value={quickTransactionData.category} onValueChange={(value) => setQuickTransactionData({ ...quickTransactionData, category: value as typeof quickTransactionData.category })}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select category (optional)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="no-category">No Category</SelectItem>
-                      {categoryOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <Button type="submit" disabled={loading} className="w-full bg-green-600 hover:bg-green-700">
-                  {loading ? "Adding..." : editingTransaction ? "Update Deposit" : "Add Deposit"}
-                </Button>
               </form>
             </DialogContent>
           </Dialog>
 
           <Dialog open={isWithdrawDialogOpen} onOpenChange={(open) => { setIsWithdrawDialogOpen(open); if (!open) resetQuickTransactionForm(); }}>
             <DialogTrigger asChild>
-              <Button variant="outline" className="flex items-center gap-2 border-red-600 text-red-600 hover:bg-red-50">
+              <Button variant="outline" className="flex items-center justify-center gap-2 border-red-600 text-red-600 hover:bg-red-50">
                 <Minus className="h-4 w-4" />
-                Withdraw
+                {isMobile ? "Withdraw" : "Add Withdraw"}
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-md">
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>{editingTransaction ? 'Edit Withdrawal' : 'Quick Withdrawal'}</DialogTitle>
               </DialogHeader>
@@ -721,6 +745,57 @@ export const BankBalance = () => {
                       {orphanBankAccounts.map((account) => (
                         <SelectItem key={account.id} value={account.id}>
                           {account.bank_name} - {account.account_number}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="withdraw_amount">Amount</Label>
+                  <Input
+                    id="withdraw_amount"
+                    type="number"
+                    step="0.01"
+                    value={quickTransactionData.amount}
+                    onChange={(e) => setQuickTransactionData({ ...quickTransactionData, amount: parseFloat(e.target.value) || 0 })}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="withdraw_date">Date</Label>
+                  <Input
+                    id="withdraw_date"
+                    type="date"
+                    value={quickTransactionData.date}
+                    onChange={(e) => setQuickTransactionData({ ...quickTransactionData, date: e.target.value })}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="withdraw_description">Description</Label>
+                  <Input
+                    id="withdraw_description"
+                    value={quickTransactionData.description}
+                    onChange={(e) => setQuickTransactionData({ ...quickTransactionData, description: e.target.value })}
+                    placeholder="Enter description"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="withdraw_category">Category (Optional)</Label>
+                  <Select value={quickTransactionData.category} onValueChange={(value) => setQuickTransactionData({ ...quickTransactionData, category: value as typeof quickTransactionData.category })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select category (optional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="no-category">No Category</SelectItem>
+                      {categoryOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -770,189 +845,127 @@ export const BankBalance = () => {
                   showRoleFilter={true}
                 />
 
-                <div>
-                  <Label htmlFor="withdraw_description">Description</Label>
-                  <Input
-                    id="withdraw_description"
-                    value={quickTransactionData.description}
-                    onChange={(e) => setQuickTransactionData({ ...quickTransactionData, description: e.target.value })}
-                    required
-                  />
+                <div className="flex gap-2 pt-4">
+                  <Button type="button" variant="outline" onClick={() => setIsWithdrawDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={loading} className="flex-1 bg-red-600 hover:bg-red-700">
+                    {loading ? "Adding..." : editingTransaction ? "Update Withdrawal" : "Add Withdrawal"}
+                  </Button>
                 </div>
-
-                <div>
-                  <Label htmlFor="withdraw_amount">Amount</Label>
-                  <Input
-                    id="withdraw_amount"
-                    type="number"
-                    step="0.01"
-                    value={quickTransactionData.amount}
-                    onChange={(e) => setQuickTransactionData({ ...quickTransactionData, amount: parseFloat(e.target.value) || 0 })}
-                    required
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="withdraw_category">Category (Optional)</Label>
-                  <Select value={quickTransactionData.category} onValueChange={(value) => setQuickTransactionData({ ...quickTransactionData, category: value as typeof quickTransactionData.category })}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select category (optional)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="no-category">No Category</SelectItem>
-                      {categoryOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <Button type="submit" disabled={loading} className="w-full bg-red-600 hover:bg-red-700">
-                  {loading ? "Adding..." : editingTransaction ? "Update Withdrawal" : "Add Withdrawal"}
-                </Button>
               </form>
             </DialogContent>
           </Dialog>
 
           <Dialog open={isBankDialogOpen} onOpenChange={(open) => { setIsBankDialogOpen(open); if (!open) resetBankForm(); }}>
             <DialogTrigger asChild>
-              <Button variant="outline" className="flex items-center gap-2">
+              <Button variant="outline" className="flex items-center justify-center gap-2">
                 <Plus className="h-4 w-4" />
-                Add Bank
+                {isMobile ? "Bank" : "Add Bank"}
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-md">
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>{editingBankAccount ? 'Edit Bank Account' : 'Add Bank Account'}</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleBankSubmit} className="space-y-4">
-                <div>
-                  <Label htmlFor="bank_name">Bank Name</Label>
-                  <Input
-                    id="bank_name"
-                    value={bankFormData.bank_name}
-                    onChange={(e) => setBankFormData({ ...bankFormData, bank_name: e.target.value })}
-                    required
-                  />
-                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="bank_name">Bank Name *</Label>
+                    <Input
+                      id="bank_name"
+                      value={bankFormData.bank_name}
+                      onChange={(e) => setBankFormData({ ...bankFormData, bank_name: e.target.value })}
+                      placeholder="Enter bank name"
+                      required
+                    />
+                  </div>
 
-                <div>
-                  <Label htmlFor="account_holder_name">Account Holder Name</Label>
-                  <Input
-                    id="account_holder_name"
-                    value={bankFormData.account_holder_name}
-                    onChange={(e) => setBankFormData({ ...bankFormData, account_holder_name: e.target.value })}
-                    required
-                  />
-                </div>
+                  <div>
+                    <Label htmlFor="account_holder_name">Account Holder Name *</Label>
+                    <Input
+                      id="account_holder_name"
+                      value={bankFormData.account_holder_name}
+                      onChange={(e) => setBankFormData({ ...bankFormData, account_holder_name: e.target.value })}
+                      placeholder="Enter account holder name"
+                      required
+                    />
+                  </div>
 
-                <div>
-                  <Label htmlFor="account_number">Account Number</Label>
-                  <Input
-                    id="account_number"
-                    value={bankFormData.account_number}
-                    onChange={(e) => setBankFormData({ ...bankFormData, account_number: e.target.value })}
-                    required
-                  />
-                </div>
+                  <div>
+                    <Label htmlFor="account_number">Account Number *</Label>
+                    <Input
+                      id="account_number"
+                      value={bankFormData.account_number}
+                      onChange={(e) => setBankFormData({ ...bankFormData, account_number: e.target.value })}
+                      placeholder="Enter account number"
+                      required
+                    />
+                  </div>
 
-                <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="bsb_code">BSB Code</Label>
                     <Input
                       id="bsb_code"
                       value={bankFormData.bsb_code}
                       onChange={(e) => setBankFormData({ ...bankFormData, bsb_code: e.target.value })}
+                      placeholder="Enter BSB code"
                     />
                   </div>
+
                   <div>
                     <Label htmlFor="swift_code">SWIFT Code</Label>
                     <Input
                       id="swift_code"
                       value={bankFormData.swift_code}
                       onChange={(e) => setBankFormData({ ...bankFormData, swift_code: e.target.value })}
+                      placeholder="Enter SWIFT code"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="opening_balance">Opening Balance</Label>
+                    <Input
+                      id="opening_balance"
+                      type="number"
+                      step="0.01"
+                      value={bankFormData.opening_balance}
+                      onChange={(e) => setBankFormData({ ...bankFormData, opening_balance: parseFloat(e.target.value) || 0 })}
+                      placeholder="0.00"
                     />
                   </div>
                 </div>
 
-                <div>
-                  <Label htmlFor="opening_balance">Opening Balance</Label>
-                  <Input
-                    id="opening_balance"
-                    type="number"
-                    step="0.01"
-                    value={bankFormData.opening_balance}
-                    onChange={(e) => setBankFormData({ ...bankFormData, opening_balance: parseFloat(e.target.value) || 0 })}
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    This will create a deposit transaction with "Opening Balance" category
-                  </p>
-                </div>
+                <p className="text-xs text-gray-500">
+                  * Required fields. Opening balance will create a deposit transaction with "Opening Balance" category
+                </p>
 
-                <Button type="submit" disabled={loading} className="w-full">
-                  {loading ? "Saving..." : editingBankAccount ? "Update Bank Account" : "Add Bank Account"}
-                </Button>
+                <div className="flex gap-2 pt-4">
+                  <Button type="button" variant="outline" onClick={() => setIsBankDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={loading} className="flex-1">
+                    {loading ? "Saving..." : editingBankAccount ? "Update Bank Account" : "Add Bank Account"}
+                  </Button>
+                </div>
               </form>
             </DialogContent>
           </Dialog>
         </div>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Total Balance</CardTitle>
-            <DollarSign className="h-4 w-4 text-blue-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600">
-              ${totalBalance.toFixed(2)}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Across {orphanBankAccounts.length} account{orphanBankAccounts.length !== 1 ? 's' : ''}
-            </p>
-          </CardContent>
-        </Card>
+      {/* Summary Cards using the new BankBalanceStats component */}
+      <BankBalanceStats 
+        totalBalance={totalBalance}
+        totalIncome={totalDeposits}
+        totalExpense={totalWithdrawals}
+      />
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Total Deposits</CardTitle>
-            <TrendingUp className="h-4 w-4 text-green-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">
-              ${totalDeposits.toFixed(2)}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {transactions.filter(t => t.type === 'deposit').length} transactions
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Total Withdrawals</CardTitle>
-            <TrendingDown className="h-4 w-4 text-red-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">
-              ${totalWithdrawals.toFixed(2)}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {transactions.filter(t => t.type === 'withdrawal').length} transactions
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 gap-6">
+      <div className="grid grid-cols-1 gap-4 md:gap-6">
         {/* Orphan Bank Accounts */}
         <Card>
           <CardHeader>
-            <CardTitle>Orphan Bank Accounts ({orphanBankAccounts.length})</CardTitle>
+            <CardTitle className="text-lg md:text-xl">Orphan Bank Accounts ({orphanBankAccounts.length})</CardTitle>
             <p className="text-sm text-gray-600">Bank accounts not linked to any profile</p>
           </CardHeader>
           <CardContent>
@@ -970,8 +983,8 @@ export const BankBalance = () => {
 
                   return (
                     <div key={account.id} className="border rounded-lg p-4">
-                      <div className="flex items-center justify-between">
-                        <div>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div className="flex-1">
                           <h3 className="font-semibold text-gray-900">{account.bank_name}</h3>
                           <p className="text-sm text-gray-600">
                             {account.account_holder_name} • ****{account.account_number.slice(-4)}
@@ -980,8 +993,8 @@ export const BankBalance = () => {
                             <p className="text-xs text-gray-500">BSB: {account.bsb_code}</p>
                           )}
                         </div>
-                        <div className="flex items-center gap-4">
-                          <div className="text-right">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                          <div className="text-center sm:text-right">
                             <div className="text-xl font-bold">
                               ${currentBalance.toFixed(2)}
                             </div>
@@ -991,7 +1004,7 @@ export const BankBalance = () => {
                               </Badge>
                             )}
                           </div>
-                          <div className="flex gap-2">
+                          <div className="flex gap-2 justify-center sm:justify-end">
                             <Button 
                               variant="ghost" 
                               size="sm" 
@@ -1022,57 +1035,64 @@ export const BankBalance = () => {
         {/* Recent Transactions */}
         <Card>
           <CardHeader>
-            <div className="flex justify-between items-center">
-              <CardTitle>Recent Transactions ({filteredTransactions.length})</CardTitle>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <CardTitle className="text-lg md:text-xl">Recent Transactions ({filteredTransactions.length})</CardTitle>
             </div>
             
             {/* Filters */}
-            <div className="flex flex-wrap items-center gap-4 mt-4">
-              <Select value={dateShortcut} onValueChange={handleDateShortcut}>
-                <SelectTrigger className="w-40">
-                  <SelectValue placeholder="Date shortcut" />
-                </SelectTrigger>
-                <SelectContent>
-                  {generateShortcutOptions().map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              
-              <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-gray-500" />
-                <Input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="w-40"
-                  placeholder="Start Date"
-                />
-                <span className="text-gray-500">to</span>
-                <Input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="w-40"
-                  placeholder="End Date"
-                />
+            <div className="space-y-4">
+              {/* Date Filters */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                <Select value={dateShortcut} onValueChange={handleDateShortcut}>
+                  <SelectTrigger className="w-full sm:w-40">
+                    <SelectValue placeholder="Date shortcut" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {generateShortcutOptions().map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <Calendar className="h-4 w-4 text-gray-500 hidden sm:block" />
+                  <Input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="flex-1 sm:w-32"
+                    placeholder="Start Date"
+                  />
+                  <span className="text-gray-500 hidden sm:block">to</span>
+                  <Input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="flex-1 sm:w-32"
+                    placeholder="End Date"
+                  />
+                </div>
               </div>
-              
-              <div className="flex items-center gap-2">
-                <Search className="h-4 w-4 text-gray-500" />
-                <Input
-                  placeholder="Search transactions..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-64"
-                />
+
+              {/* Search and Filter */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                <div className="flex items-center gap-2 flex-1">
+                  <Search className="h-4 w-4 text-gray-500" />
+                  <Input
+                    placeholder="Search transactions..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="flex-1"
+                  />
+                </div>
                 
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" size="sm" className="h-10 w-10 p-0">
-                      <Filter className="h-4 w-4" />
+                    <Button variant="outline" size="sm" className="w-full sm:w-auto h-10">
+                      <Filter className="h-4 w-4 mr-2" />
+                      Filters
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-80" align="end">
@@ -1152,84 +1172,106 @@ export const BankBalance = () => {
               </div>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-0 sm:p-6">
             {filteredTransactions.length === 0 ? (
               <p className="text-gray-500 text-center py-8">
                 {searchTerm ? "No transactions match your search." : "No transactions found. Add your first transaction above."}
               </p>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-gray-200">
-                      <th className="text-left py-3 px-4 font-medium text-gray-600">Date</th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-600">Description</th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-600">Category</th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-600">Client/Project</th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-600">Profile</th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-600">Amount</th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-600">Type</th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-600">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredTransactions.map((transaction) => (
-                      <tr key={transaction.id} className="border-b border-gray-100 hover:bg-gray-50">
-                        <td className="py-3 px-4 text-gray-600">
-                          {new Date(transaction.date).toLocaleDateString()}
-                        </td>
-                        <td className="py-3 px-4 text-gray-900">{transaction.description}</td>
-                        <td className="py-3 px-4">
-                          <Badge variant="outline">{transaction.category}</Badge>
-                        </td>
-                        <td className="py-3 px-4 text-gray-600">
-                          {transaction.clients?.company && (
-                            <div>
-                              <div className="font-medium">{transaction.clients.company}</div>
-                              {transaction.projects?.name && (
-                                <div className="text-sm text-gray-500">{transaction.projects.name}</div>
-                              )}
-                            </div>
-                          )}
-                        </td>
-                        <td className="py-3 px-4 text-gray-600">
-                          {transaction.profiles?.full_name || 'N/A'}
-                        </td>
-                        <td className="py-3 px-4">
-                          <span className={`font-medium ${transaction.type === 'deposit' ? 'text-green-600' : 'text-red-600'}`}>
-                            {transaction.type === 'deposit' ? '+' : '-'}${transaction.amount.toFixed(2)}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4">
-                          <Badge variant={transaction.type === 'deposit' ? 'default' : 'destructive'}>
-                            {transaction.type}
-                          </Badge>
-                        </td>
-                        <td className="py-3 px-4">
-                          <div className="flex items-center gap-2">
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              onClick={() => handleEditTransaction(transaction)}
-                              className="text-blue-600 hover:text-blue-700"
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              onClick={() => handleDeleteTransaction(transaction.id)}
-                              className="text-red-600 hover:text-red-700"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </td>
+              <>
+                {/* Mobile List View */}
+                <div className="block md:hidden p-4">
+                  <TransactionList
+                    transactions={filteredTransactions}
+                    onEdit={handleEditTransaction}
+                    onDelete={handleDeleteTransaction}
+                  />
+                </div>
+
+                {/* Desktop Table View */}
+                <div className="hidden md:block overflow-x-auto">
+                  <table className="w-full min-w-[600px]">
+                    <thead>
+                      <tr className="border-b border-gray-200">
+                        <th className="text-left py-3 px-2 sm:px-4 font-medium text-gray-600 text-xs sm:text-sm">Date</th>
+                        <th className="text-left py-3 px-2 sm:px-4 font-medium text-gray-600 text-xs sm:text-sm">Description</th>
+                        <th className="text-left py-3 px-2 sm:px-4 font-medium text-gray-600 text-xs sm:text-sm hidden sm:table-cell">Category</th>
+                        <th className="text-left py-3 px-2 sm:px-4 font-medium text-gray-600 text-xs sm:text-sm hidden md:table-cell">Client/Project</th>
+                        <th className="text-left py-3 px-2 sm:px-4 font-medium text-gray-600 text-xs sm:text-sm hidden lg:table-cell">Profile</th>
+                        <th className="text-left py-3 px-2 sm:px-4 font-medium text-gray-600 text-xs sm:text-sm">Amount</th>
+                        <th className="text-left py-3 px-2 sm:px-4 font-medium text-gray-600 text-xs sm:text-sm">Type</th>
+                        <th className="text-left py-3 px-2 sm:px-4 font-medium text-gray-600 text-xs sm:text-sm">Actions</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {filteredTransactions.map((transaction) => (
+                        <tr key={transaction.id} className="border-b border-gray-100 hover:bg-gray-50">
+                          <td className="py-3 px-2 sm:px-4 text-gray-600 text-xs sm:text-sm">
+                            {new Date(transaction.date).toLocaleDateString()}
+                          </td>
+                          <td className="py-3 px-2 sm:px-4 text-gray-900 text-xs sm:text-sm">
+                            <div className="truncate max-w-[120px] sm:max-w-none" title={transaction.description}>
+                              {transaction.description}
+                            </div>
+                          </td>
+                          <td className="py-3 px-2 sm:px-4 hidden sm:table-cell">
+                            <Badge variant="outline" className="text-xs">{transaction.category}</Badge>
+                          </td>
+                          <td className="py-3 px-2 sm:px-4 text-gray-600 text-xs sm:text-sm hidden md:table-cell">
+                            {transaction.clients?.company && (
+                              <div>
+                                <div className="font-medium truncate max-w-[100px]" title={transaction.clients.company}>
+                                  {transaction.clients.company}
+                                </div>
+                                {transaction.projects?.name && (
+                                  <div className="text-xs text-gray-500 truncate max-w-[100px]" title={transaction.projects.name}>
+                                    {transaction.projects.name}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-3 px-2 sm:px-4 text-gray-600 text-xs sm:text-sm hidden lg:table-cell">
+                            <div className="truncate max-w-[100px]" title={transaction.profiles?.full_name || 'N/A'}>
+                              {transaction.profiles?.full_name || 'N/A'}
+                            </div>
+                          </td>
+                          <td className="py-3 px-2 sm:px-4">
+                            <span className={`font-medium text-xs sm:text-sm ${transaction.type === 'deposit' ? 'text-green-600' : 'text-red-600'}`}>
+                              {transaction.type === 'deposit' ? '+' : '-'}${transaction.amount.toFixed(2)}
+                            </span>
+                          </td>
+                          <td className="py-3 px-2 sm:px-4">
+                            <Badge variant={transaction.type === 'deposit' ? 'default' : 'destructive'} className="text-xs">
+                              {transaction.type}
+                            </Badge>
+                          </td>
+                          <td className="py-3 px-2 sm:px-4">
+                            <div className="flex items-center gap-1">
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                onClick={() => handleEditTransaction(transaction)}
+                                className="text-blue-600 hover:text-blue-700 h-8 w-8 p-0"
+                              >
+                                <Edit className="h-3 w-3 sm:h-4 sm:w-4" />
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                onClick={() => handleDeleteTransaction(transaction.id)}
+                                className="text-red-600 hover:text-red-700 h-8 w-8 p-0"
+                              >
+                                <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             )}
           </CardContent>
         </Card>

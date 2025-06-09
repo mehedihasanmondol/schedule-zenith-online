@@ -24,17 +24,21 @@ interface SidebarProps {
   onTabChange: (tab: string) => void;
   hasPermission: (permission: string) => boolean;
   onCollapsedChange?: (collapsed: boolean) => void;
+  isMobile?: boolean;
 }
 
-export const Sidebar = ({ activeTab, onTabChange, hasPermission, onCollapsedChange }: SidebarProps) => {
+export const Sidebar = ({ activeTab, onTabChange, hasPermission, onCollapsedChange, isMobile = false }: SidebarProps) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   // Check if device is mobile/tablet and set initial collapsed state
   useEffect(() => {
     const checkMobile = () => {
       const isMobile = window.innerWidth < 768; // 768px is md breakpoint
-      setIsCollapsed(isMobile);
-      onCollapsedChange?.(isMobile);
+      // Only auto-collapse on desktop, mobile uses sheet navigation
+      if (!isMobile) {
+        setIsCollapsed(false);
+        onCollapsedChange?.(false);
+      }
     };
 
     // Check on initial load
@@ -148,21 +152,28 @@ export const Sidebar = ({ activeTab, onTabChange, hasPermission, onCollapsedChan
 
   return (
     <div className={cn(
-      "fixed left-0 top-0 h-full bg-white border-r border-gray-200 transition-all duration-300 z-50 flex flex-col",
-      isCollapsed ? "w-16" : "w-64"
+      "bg-white border-r border-gray-200 transition-all duration-300 flex flex-col",
+      isMobile 
+        ? "h-full w-full" 
+        : cn(
+            "fixed left-0 top-0 h-full z-50",
+            isCollapsed ? "w-16" : "w-64"
+          )
     )}>
       <div className="flex items-center justify-between p-4 border-b border-gray-200 flex-shrink-0">
-        {!isCollapsed && (
+        {(!isCollapsed || isMobile) && (
           <h2 className="text-lg md:text-xl font-bold text-gray-900">
             Schedule & Payroll
           </h2>
         )}
-        <button
-          onClick={toggleCollapsed}
-          className="p-2 rounded-md hover:bg-gray-100"
-        >
-          <Menu className="h-5 w-5" />
-        </button>
+        {!isMobile && (
+          <button
+            onClick={toggleCollapsed}
+            className="p-2 rounded-md hover:bg-gray-100"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+        )}
       </div>
       
       <ScrollArea className="flex-1 mt-8">
@@ -182,10 +193,10 @@ export const Sidebar = ({ activeTab, onTabChange, hasPermission, onCollapsedChan
                         ? "bg-blue-100 text-blue-900 font-medium"
                         : "text-gray-700 hover:bg-gray-100"
                     )}
-                    title={isCollapsed ? item.label : undefined}
+                    title={isCollapsed && !isMobile ? item.label : undefined}
                   >
-                    <Icon className={cn("h-5 w-5", isCollapsed ? "mx-auto" : "mr-3")} />
-                    {!isCollapsed && <span className="truncate">{item.label}</span>}
+                    <Icon className={cn("h-5 w-5", isCollapsed && !isMobile ? "mx-auto" : "mr-3")} />
+                    {(!isCollapsed || isMobile) && <span className="truncate">{item.label}</span>}
                   </button>
                 </li>
               );

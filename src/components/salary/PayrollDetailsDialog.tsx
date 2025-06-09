@@ -22,6 +22,7 @@ export const PayrollDetailsDialog = ({
   const [isPrinting, setIsPrinting] = useState(false);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [bankAccount, setBankAccount] = useState<BankAccount | null>(null);
+  const [paymentBankAccount, setPaymentBankAccount] = useState<BankAccount | null>(null);
   const [workingHours, setWorkingHours] = useState<WorkingHour[]>([]);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -57,6 +58,19 @@ export const PayrollDetailsDialog = ({
 
       if (!bankError && bankData) {
         setBankAccount(bankData);
+      }
+
+      // Fetch payment bank account if payroll has been paid
+      if (payroll.bank_account_id && payroll.status === 'paid') {
+        const { data: paymentBankData, error: paymentBankError } = await supabase
+          .from('bank_accounts')
+          .select('*')
+          .eq('id', payroll.bank_account_id)
+          .single();
+
+        if (!paymentBankError && paymentBankData) {
+          setPaymentBankAccount(paymentBankData);
+        }
       }
 
       // Fetch working hours linked to this specific payroll via payroll_working_hours
@@ -157,6 +171,17 @@ Account Holder: ${bankAccount.account_holder_name}
 ${bankAccount.bsb_code ? `BSB Code: ${bankAccount.bsb_code}` : ''}
 ${bankAccount.swift_code ? `SWIFT Code: ${bankAccount.swift_code}` : ''}
 ` : 'No bank account information available'}
+
+${paymentBankAccount && payroll.status === 'paid' ? `
+PAYMENT BANK ACCOUNT
+--------------------
+Bank Name: ${paymentBankAccount.bank_name}
+Account Number: ${paymentBankAccount.account_number}
+Account Holder: ${paymentBankAccount.account_holder_name}
+${paymentBankAccount.bsb_code ? `BSB Code: ${paymentBankAccount.bsb_code}` : ''}
+${paymentBankAccount.swift_code ? `SWIFT Code: ${paymentBankAccount.swift_code}` : ''}
+Note: This payment was processed from this company bank account.
+` : ''}
 
 WORKING HOURS BREAKDOWN
 -----------------------
@@ -358,6 +383,51 @@ This is an automatically generated payslip.
                     <div className="font-medium">{bankAccount.swift_code}</div>
                   </div>
                 )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Payment Bank Account Information */}
+          {paymentBankAccount && payroll.status === 'paid' && (
+            <Card className="print:shadow-none print:border">
+              <CardHeader className="print:pb-2">
+                <CardTitle className="flex items-center gap-2 text-lg print:text-base">
+                  <Building className="h-5 w-5" />
+                  Payment Bank Account
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4 print:gap-2">
+                <div>
+                  <div className="text-sm text-gray-600">Bank Name</div>
+                  <div className="font-medium">{paymentBankAccount.bank_name}</div>
+                </div>
+                <div>
+                  <div className="text-sm text-gray-600">Account Number</div>
+                  <div className="font-medium">{paymentBankAccount.account_number}</div>
+                </div>
+                <div>
+                  <div className="text-sm text-gray-600">Account Holder</div>
+                  <div className="font-medium">{paymentBankAccount.account_holder_name}</div>
+                </div>
+                {paymentBankAccount.bsb_code && (
+                  <div>
+                    <div className="text-sm text-gray-600">BSB Code</div>
+                    <div className="font-medium">{paymentBankAccount.bsb_code}</div>
+                  </div>
+                )}
+                {paymentBankAccount.swift_code && (
+                  <div className="md:col-span-2">
+                    <div className="text-sm text-gray-600">SWIFT Code</div>
+                    <div className="font-medium">{paymentBankAccount.swift_code}</div>
+                  </div>
+                )}
+                <div className="md:col-span-2">
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                    <div className="text-sm text-green-800">
+                      This payment was processed from this company bank account.
+                    </div>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           )}

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -12,10 +11,11 @@ interface PayrollEditDialogProps {
   payroll: Payroll | null;
   isOpen: boolean;
   onClose: () => void;
-  onUpdate: () => void;
+  onUpdate?: () => void;
+  onSuccess?: () => void; // Added this prop to handle both naming conventions
 }
 
-export const PayrollEditDialog = ({ payroll, isOpen, onClose, onUpdate }: PayrollEditDialogProps) => {
+export const PayrollEditDialog = ({ payroll, isOpen, onClose, onUpdate, onSuccess }: PayrollEditDialogProps) => {
   const [formData, setFormData] = useState({
     pay_period_start: "",
     pay_period_end: "",
@@ -101,7 +101,10 @@ export const PayrollEditDialog = ({ payroll, isOpen, onClose, onUpdate }: Payrol
       if (error) throw error;
 
       toast({ title: "Success", description: "Payroll record updated successfully" });
-      onUpdate();
+      
+      // Call both callbacks if they exist
+      onUpdate?.();
+      onSuccess?.();
       onClose();
     } catch (error) {
       console.error('Error updating payroll:', error);
