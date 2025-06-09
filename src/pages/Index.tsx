@@ -188,8 +188,8 @@ const Index = () => {
               </div>
             </div>
 
-            {/* App Name - Hidden on mobile */}
-            <div className="hidden md:block flex-1">
+            {/* App Name - Always visible on mobile, visible on desktop when sidebar collapsed */}
+            <div className={`flex-1 ${sidebarCollapsed ? 'md:block' : 'md:hidden'} block`}>
               <h1 className="text-xl md:text-2xl font-semibold text-gray-900">
                 Schedule & Payroll
               </h1>
